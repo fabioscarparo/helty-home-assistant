@@ -10,6 +10,7 @@
 <p align="center">
   <a href="https://esphome.io/"><img alt="ESPHome 2026.9+" src="https://img.shields.io/badge/ESPHome-2026.9%2B-000?logo=esphome&logoColor=fff"></a>
   <a href="https://www.home-assistant.io/"><img alt="Home Assistant" src="https://img.shields.io/badge/Home_Assistant-18BCF2?logo=homeassistant&logoColor=fff"></a>
+  <a href="#dashboard-card"><img alt="HACS Custom" src="https://img.shields.io/badge/HACS-Custom-41BDF5?logo=homeassistantcommunitystore&logoColor=fff"></a>
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/License-MIT-333"></a>
 </p>
 
@@ -31,6 +32,8 @@ It was designed to be easy and cheap to build:
 - **Local** - everything stays on your home network
 - **Careful** - the firmware can only change the operating mode, and it
   never writes anything when it starts
+- **Familiar** - a [dashboard card](#dashboard-card) that recalls the
+  wall panel of the unit, built like the core cards of Home Assistant
 
 <p align="center">
   <img src="images/installation.jpg" alt="A Flow40 with its front cover off: four wires run from the green terminal block to the ATOM Lite on its RS485 base, tucked in the bottom of the casing" width="420">
@@ -221,16 +224,101 @@ A few notes:
 
 ### 6. Dashboard and automations
 
-[docs/home-assistant.md](docs/home-assistant.md) has a dashboard card
-ready to paste and a few automations: night mode, filter reminder, free
-cooling on summer evenings and an alert when the unit stops answering.
+Add the [Helty Flow40 card](#dashboard-card) for a dashboard that looks
+like the wall panel of the unit. [docs/home-assistant.md](docs/home-assistant.md)
+has a card made with core cards only and a few automations: night mode,
+filter reminder, free cooling on summer evenings and an alert when the
+unit stops answering.
+
+## Dashboard card
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/card-dark.png">
+  <img alt="The Helty Flow40 card at speed 2, in Night mode, and in Free cooling with the filter alarm" src="images/card-light.png">
+</picture>
+
+The **Helty Flow40 card** recalls the wall panel of the unit: the same
+symbols in the same places, with the four speeds next to ventilation. It's
+built like the core cards of Home Assistant, so it follows your theme,
+light or dark, and the language of your profile.
+
+| Control | What it does |
+|---|---|
+| Icon in the header | Turns the unit on and off, like the icon of a tile card |
+| Name in the header | Opens the details and the history of the fan |
+| Indoor, Outdoor | The two temperatures: tap for their history |
+| Ventilation | Like the key on the panel: off, speed 1, 2, 3, 4, then off again |
+| 1 2 3 4 | The speed, filled up to the current one like the LEDs of the panel: tap a number to jump straight to that speed |
+| Night | Minimum speed. Tap again to go back to the previous speed |
+| Hyper | Maximum airflow, all four speeds filled. Tap again to go back to the previous speed |
+| Free cooling | Turns free cooling on. Tap again to turn it off |
+| Filter | Turns amber when the filter needs cleaning, with the steps to reset the alarm |
+
+The card also tells you when the unit doesn't answer over Modbus, and
+when it reports a frost alarm or a fault.
+
+> [!IMPORTANT]
+> The card needs version **1.0.0** of the ESPHome configuration: it finds
+> the unit by the model that version sets, and recognizes the entities by
+> their icons. If your device was set up before, install the configuration
+> again with **Install → Wirelessly**.
+
+### Install with HACS
+
+The card is not in the default HACS store: add this repository as a
+custom repository.
+
+1. Open **HACS**, then **⋮ → Custom repositories**.
+2. Add `https://github.com/fabioscarparo/helty-home-assistant` with type
+   **Dashboard**.
+3. Search for **Helty Flow40 Card**, open it and select **Download**. HACS
+   adds the dashboard resource for you and lets you know when a new
+   version is out.
+4. Reload the browser.
+
+### Manual installation
+
+1. Copy [`helty-flow40-card.js`](helty-flow40-card.js) into the `www/`
+   folder of your Home Assistant configuration.
+2. Go to **Settings → Dashboards → ⋮ → Resources → Add resource**, enter
+   `/local/helty-flow40-card.js` and choose **JavaScript module**. The
+   **Resources** menu shows up with **Advanced mode** turned on in your
+   user profile.
+3. Reload the browser.
+
+### Adding the card
+
+1. Open a dashboard and select **Edit dashboard** (pencil).
+2. Select **Add card** and search for **Helty Flow40**.
+3. Pick your unit in the visual editor and save.
+
+```yaml
+type: custom:helty-flow40-card
+device_id: 0123456789abcdef0123456789abcdef
+name: Ventilation   # optional: defaults to the device name
+color: light-blue   # optional: active controls and speeds, a Home Assistant color name or any CSS color
+```
+
+If you changed the icon of one of the unit's entities in Home Assistant,
+the card can't recognize that entity: point the card to it yourself.
+
+```yaml
+entities:
+  night: switch.helty_flow40_night
+```
+
+The roles are `fan`, `hyper`, `night`, `free_cooling`, `filter`, `frost`,
+`modbus`, `indoor` and `outdoor`.
 
 ## Language support
 
-| Language | Entity names |
-|---|---|
-| English | ✅ default |
-| Italian | ✅ [`locales/it.yaml`](esphome/locales/it.yaml) |
+| Language | Entity names | Card |
+|---|---|---|
+| English | ✅ default | ✅ |
+| Italian | ✅ [`locales/it.yaml`](esphome/locales/it.yaml) | ✅ |
+
+The card follows the language of each user's profile, with English for any
+other language.
 
 Entity names are part of the configuration, so Home Assistant shows them
 as they are, whatever the language of your profile. To switch language,
@@ -254,9 +342,15 @@ language, such as `Notte` instead of `Night`.
 
 ### Help translate
 
-Copy [`locales/it.yaml`](esphome/locales/it.yaml) to a file named after
-your language, such as `de.yaml`, translate the values and leave the keys
-as they are. Then open a pull request.
+- **Entity names**: copy [`locales/it.yaml`](esphome/locales/it.yaml) to
+  a file named after your language, such as `de.yaml`, translate the values
+  and leave the keys as they are.
+- **The card**: its texts are in `STRINGS`, at the top of
+  [`helty-flow40-card.js`](helty-flow40-card.js). Add your language next
+  to `en` and `it`.
+
+Then open a pull request, or send the texts with the
+[Translation form](https://github.com/fabioscarparo/helty-home-assistant/issues/new?template=translation.yml).
 
 ## Updating
 
@@ -267,6 +361,8 @@ only when encrypted with the API key.
 
 To stay on a version until you decide to move, set `ref:` in
 `device.yaml` to a release tag instead of `main`.
+
+The card updates from HACS, which shows when a new version is out.
 
 ## How it works
 
@@ -289,6 +385,9 @@ The ESP reads the unit every 10 seconds over Modbus RTU, at 19200 baud,
 - **Turning a preset off** goes back to the last speed used.
 - **Alarm code 20480 (0x5000) is normal**: those are the "no humidity
   sensor" and "no CO2 sensor" bits, always on in the Flow40.
+- **The filter alarm is reset on the unit**: after cleaning or replacing
+  the filter, hold ventilation and hyper together on the wall panel for
+  5 seconds, until all the LEDs blink twice.
 
 The full map, with the alarm bits and the registers still unknown, is in
 [Modbus registers](docs/modbus-registers.md).
@@ -302,6 +401,8 @@ see [Troubleshooting](docs/troubleshooting.md).
 ## Repository layout
 
 ```text
+helty-flow40-card.js       the dashboard card
+hacs.json                  lets HACS install the card
 esphome/
   device.yaml              the file to paste into ESPHome Device Builder
   helty-flow40.yaml        the full configuration, loaded by device.yaml
@@ -312,11 +413,15 @@ docs/
   modbus-registers.md      register map
   troubleshooting.md       common problems
 images/                    header, icon and pictures for this README
+.github/ISSUE_TEMPLATE/    forms for bug reports and translations
 ```
 
 ## Contributing
 
-Reports and improvements are welcome, especially:
+Reports and improvements are welcome. Open an issue with the
+[Bug report](https://github.com/fabioscarparo/helty-home-assistant/issues/new?template=bug_report.yml)
+form, which asks for the versions that help to find the cause. Ideas
+especially welcome:
 
 - **Other firmware versions** - this configuration is checked on a Flow40
   with firmware 117, PID 0x1102

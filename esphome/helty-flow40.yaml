@@ -19,6 +19,9 @@
 #   HR 1000  machine state          0=off 1-4=speed 5=hyper 6=night 7=free cooling
 # The only possible write is HR 1000 with a value from 0 to 7, always through
 # the internal "Machine state" select. Nothing is written at boot.
+#
+# The dashboard card (helty-flow40-card.js) recognizes the entities by their
+# icons, in any language: keep the icons of switches, temperatures and alarms.
 # -----------------------------------------------------------------------------
 
 substitutions:
@@ -54,6 +57,11 @@ esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
   min_version: 2026.9.0           # needed for encrypted OTA updates
+  # Shown in Home Assistant as the device's manufacturer, model and firmware.
+  # The dashboard card finds the unit by this model.
+  project:
+    name: fabioscarparo.helty-flow40
+    version: "1.0.0"
 
 esp32:
   board: m5stack-atom
@@ -278,6 +286,7 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: helty
     name: "${name_indoor_temperature}"
+    icon: mdi:home-thermometer  # the dashboard card tells the two temperatures apart by icon
     register_type: read
     address: 1000
     value_type: S_WORD
@@ -299,6 +308,7 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: helty
     name: "${name_outdoor_temperature}"
+    icon: mdi:sun-thermometer
     register_type: read
     address: 1001
     value_type: S_WORD          # signed: below zero in winter

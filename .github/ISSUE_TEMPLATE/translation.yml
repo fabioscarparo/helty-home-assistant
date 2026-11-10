@@ -1,0 +1,27 @@
+name: Translation
+description: Entity names and card texts in a new language, or a fix to an existing one
+labels: ["translation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping! Translate the values and leave the keys as they are. Where the Helty panel or app has a name for something in your language, use that one.
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: "German (de)"
+    validations:
+      required: true
+  - type: textarea
+    id: entity_names
+    attributes:
+      label: Entity names
+      description: A copy of [`esphome/locales/it.yaml`](https://github.com/fabioscarparo/helty-home-assistant/blob/main/esphome/locales/it.yaml) with the values in your language
+      render: yaml
+  - type: textarea
+    id: card_texts
+    attributes:
+      label: Card texts
+      description: The `en` block of `STRINGS` at the top of [`helty-flow40-card.js`](https://github.com/fabioscarparo/helty-home-assistant/blob/main/helty-flow40-card.js), with the values in your language
+      render: js

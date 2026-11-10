@@ -67,6 +67,35 @@ That's on purpose: when it starts, the ESP writes nothing to the unit and
 waits for the first read, about 10 seconds. If they stay unknown longer,
 it's a communication problem: see the first section.
 
+## The filter alarm stays on after cleaning
+
+The unit keeps the alarm until you reset it on its wall panel: hold
+**ventilation** and **hyper** together for 5 seconds, until all the LEDs
+blink twice. The **Filter alarm** entity turns off at the next read, about
+10 seconds later.
+
+## The card says it can't find the Flow40
+
+The card finds the unit by the model that version 1.0.0 of the ESPHome
+configuration sets (`helty-flow40`), and recognizes the entities by their
+icons. Install the configuration again with **Install → Wirelessly**, then
+check on the device page in Home Assistant that the model reads
+**helty-flow40** and the firmware **1.0.0**.
+
+## A control of the card is greyed out
+
+The card can't find the entity behind it, usually because its icon was
+changed in Home Assistant. Restore the icon, or point the card to the
+entity with the `entities:` option, as explained in
+[Adding the card](../README.md#adding-the-card).
+
+## The card is missing or shows "Custom element doesn't exist"
+
+Reload the browser after installing or updating the card. The companion
+app may keep the old frontend in its cache: reset it in **Settings →
+Companion app → Troubleshooting → Reset frontend cache** on Android, or
+**Settings → Companion app → Debugging → Clear web view cache** on iOS.
+
 ## Alarm code reads 20480
 
 That's normal: 20480 is 0x5000, the "no humidity sensor" and "no CO2

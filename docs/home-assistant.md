@@ -16,8 +16,10 @@ device named **Helty Flow40**, with English names. Check yours in
 
 ## Dashboard
 
-A tile card with speed and presets. While editing a dashboard, select
-**Add card → Manual** and paste:
+The [Helty Flow40 card](../README.md#dashboard-card) reproduces the wall
+panel of the unit, finds the entities by itself and needs no IDs. With the
+core cards of Home Assistant only, a tile card with speed and presets does
+the job: while editing a dashboard, select **Add card → Manual** and paste:
 
 ```yaml
 type: tile
@@ -105,12 +107,19 @@ actions:
   - action: persistent_notification.create
     data:
       title: Helty Flow40
-      message: The filter needs cleaning or replacing.
+      message: >-
+        The filter needs cleaning or replacing. Then reset the alarm on the
+        wall panel: hold ventilation and hyper together for 5 seconds,
+        until all the LEDs blink twice.
 mode: single
 ```
 
 To get it on your phone, replace the action with
 `notify.mobile_app_<your_phone>`.
+
+The alarm is reset only on the unit: Home Assistant can't clear it,
+because the configuration writes nothing but the operating mode. Once
+reset, the **Filter alarm** entity turns off at the next read.
 
 ### Alert when the unit stops answering
 

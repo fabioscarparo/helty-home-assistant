@@ -1,0 +1,62 @@
+name: Bug report
+description: Something in the guide, the ESPHome configuration or the card doesn't work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! The versions below help a lot to find the cause.
+
+        **Never paste your `secrets.yaml`**: it holds your Wi-Fi password and the API key.
+  - type: dropdown
+    id: part
+    attributes:
+      label: Part
+      options:
+        - Wiring and hardware
+        - ESPHome configuration
+        - Dashboard card
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens?
+      description: What you see, and what you expected instead. Screenshots are welcome.
+    validations:
+      required: true
+  - type: input
+    id: unit_firmware
+    attributes:
+      label: Firmware of the unit
+      description: The value of the **Firmware version** entity of the device in Home Assistant
+      placeholder: "117"
+    validations:
+      required: true
+  - type: input
+    id: configuration_version
+    attributes:
+      label: Configuration version
+      description: On the device page in Home Assistant, next to **Firmware**
+      placeholder: "1.0.0 (ESPHome 2026.9.2)"
+    validations:
+      required: true
+  - type: input
+    id: card_version
+    attributes:
+      label: Card version
+      description: Only for the card. Shown in HACS, and in the browser console as HELTY FLOW40 CARD
+      placeholder: "1.0.0"
+  - type: input
+    id: home_assistant_version
+    attributes:
+      label: Home Assistant version
+      description: In **Settings → About**
+      placeholder: "2026.11.0"
+  - type: textarea
+    id: logs
+    attributes:
+      label: ESPHome logs
+      description: From **ESPHome Device Builder → Logs**, about a minute around the problem
+      render: text
