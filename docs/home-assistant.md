@@ -28,11 +28,12 @@ features:
   - type: fan-speed
   - type: fan-preset-modes
     style: dropdown
-    preset_modes:
-      - Hyper
-      - Night
-      - Free cooling
 ```
+
+Without a `preset_modes` list the card shows every preset of the fan, with
+the names of your [language](../README.md#language-support): with the
+Italian names, for example, **Night** is **Notte**. Listing the presets
+by hand works too, but only with the names the fan actually has.
 
 And a card with temperatures and alarms:
 
