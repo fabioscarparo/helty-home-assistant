@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Wiring between the Helty Flow40 and the M5Stack Atomic RS485 Base</title>
+  <desc id="d">Terminal 1 (24 Vdc -) to G, terminal 2 (24 Vdc +) to DC 24V, terminal 4 (Modbus +) to A, terminal 5 (Modbus -) to B. Terminals 3, 6 and X stay free.</desc>
+
+  <rect width="800" height="450" rx="16" fill="#ffffff"/>
+
+  <!-- Helty Flow40 terminal block -->
+  <text x="230" y="40" text-anchor="middle" font-size="18" font-weight="600" fill="#1f2328">Helty Flow40</text>
+  <text x="230" y="62" text-anchor="middle" font-size="13" fill="#59636e">green Modbus terminal block</text>
+  <rect x="200" y="80" width="64" height="290" rx="6" fill="#2e9e6b" stroke="#1d6b47" stroke-width="2"/>
+
+  <g font-size="14" fill="#ffffff" font-weight="600" text-anchor="middle">
+    <rect x="232" y="88" width="22" height="24" rx="3" fill="#1d6b47"/><text x="215" y="105">X</text>
+    <rect x="232" y="128" width="22" height="24" rx="3" fill="#1d6b47"/><text x="215" y="145">6</text>
+    <rect x="232" y="168" width="22" height="24" rx="3" fill="#1d6b47"/><text x="215" y="185">5</text>
+    <rect x="232" y="208" width="22" height="24" rx="3" fill="#1d6b47"/><text x="215" y="225">4</text>
+    <rect x="232" y="248" width="22" height="24" rx="3" fill="#1d6b47"/><text x="215" y="265">3</text>
+    <rect x="232" y="288" width="22" height="24" rx="3" fill="#1d6b47"/><text x="215" y="305">2</text>
+    <rect x="232" y="328" width="22" height="24" rx="3" fill="#1d6b47"/><text x="215" y="345">1</text>
+  </g>
+
+  <g font-size="14" text-anchor="end">
+    <text x="188" y="105" fill="#8c959f">not used</text>
+    <text x="188" y="145" fill="#8c959f">not used</text>
+    <text x="188" y="185" fill="#1f2328" font-weight="600">Modbus - (RX -)</text>
+    <text x="188" y="225" fill="#1f2328" font-weight="600">Modbus + (RX +)</text>
+    <text x="188" y="265" fill="#8c959f">not used</text>
+    <text x="188" y="305" fill="#1f2328" font-weight="600">24 Vdc +</text>
+    <text x="188" y="345" fill="#1f2328" font-weight="600">24 Vdc -</text>
+  </g>
+
+  <!-- Atomic RS485 Base -->
+  <text x="635" y="40" text-anchor="middle" font-size="18" font-weight="600" fill="#1f2328">Atomic RS485 Base</text>
+  <text x="635" y="62" text-anchor="middle" font-size="13" fill="#59636e">with the ATOM Lite on top</text>
+  <rect x="530" y="110" width="210" height="250" rx="14" fill="#d0d7de" stroke="#8c959f" stroke-width="2"/>
+  <rect x="540" y="130" width="52" height="210" rx="5" fill="#f08a24" stroke="#b35f0e" stroke-width="2"/>
+
+  <g fill="#b35f0e">
+    <rect x="550" y="153" width="24" height="24" rx="3"/>
+    <rect x="550" y="203" width="24" height="24" rx="3"/>
+    <rect x="550" y="253" width="24" height="24" rx="3"/>
+    <rect x="550" y="303" width="24" height="24" rx="3"/>
+  </g>
+
+  <g font-size="16" font-weight="700" fill="#1f2328">
+    <text x="606" y="171">B</text>
+    <text x="606" y="221">A</text>
+    <text x="606" y="271">DC 24V</text>
+    <text x="606" y="321">G</text>
+  </g>
+  <text x="635" y="388" text-anchor="middle" font-size="13" fill="#59636e">ATOM: TX GPIO19, RX GPIO22</text>
+
+  <!-- Wires -->
+  <g fill="none" stroke-width="6" stroke-linecap="round">
+    <path d="M243 180 C 400 180, 400 165, 562 165" stroke="#2563eb"/>
+    <path d="M243 220 C 400 220, 400 215, 562 215" stroke="#ea7a12"/>
+    <path d="M243 300 C 400 300, 400 265, 562 265" stroke="#dc2626"/>
+    <path d="M243 340 C 400 340, 400 315, 562 315" stroke="#1f2328"/>
+  </g>
+
+  <text x="400" y="425" text-anchor="middle" font-size="13" fill="#59636e">Wire with the unit unplugged from the mains. Terminals 3, 6 and X stay free.</text>
+</svg>

@@ -1,0 +1,428 @@
+# -----------------------------------------------------------------------------
+# Helty Flow40 - M5Stack ATOM Lite + Atomic RS485 Base
+# https://github.com/fabioscarparo/helty-home-assistant
+#
+# Usually loaded as a package by device.yaml. It also works on its own: paste
+# it whole into ESPHome Device Builder.
+#
+# Entities in Home Assistant:
+#   Ventilation    fan: on/off, 4 speeds, Hyper/Night/Free cooling presets
+#   Hyper, Night, Free cooling   switches, mutually exclusive. Turning a
+#                  preset off goes back to the last speed used.
+#   Temperatures, alarms, Modbus communication, diagnostics
+#
+# Registers checked on a Flow40 (firmware 117, PID 0x1102):
+#   IR 1000  indoor temperature     x0.1 °C
+#   IR 1001  outdoor temperature    x0.1 °C
+#   IR 1006  alarm bitmask          (0x5000 = no CO2 and humidity sensors)
+#   IR 1012  firmware version
+#   HR 1000  machine state          0=off 1-4=speed 5=hyper 6=night 7=free cooling
+# The only possible write is HR 1000 with a value from 0 to 7, always through
+# the internal "Machine state" select. Nothing is written at boot.
+# -----------------------------------------------------------------------------
+
+substitutions:
+  device_name: helty-flow40       # host name on the network
+  friendly_name: Helty Flow40     # device name in Home Assistant
+  modbus_address: "2"             # Modbus address of the VMC (2 from the factory)
+  tx_pin: GPIO19
+  rx_pin: GPIO22
+
+  # Entity names. A file in locales/ replaces them with another language.
+  # Changing a name on a device already in Home Assistant creates new entities.
+  name_fan: Ventilation
+  name_hyper: Hyper
+  name_night: Night
+  name_free_cooling: Free cooling
+  name_indoor_temperature: Indoor temperature
+  name_outdoor_temperature: Outdoor temperature
+  name_alarm_code: Alarm code
+  name_firmware: Firmware version
+  name_register_1010: Register 1010
+  name_register_1014: Register 1014
+  name_wifi_signal: WiFi signal
+  name_modbus: Modbus communication
+  name_filter_alarm: Filter alarm
+  name_frost_alarm: Frost alarm
+  name_indoor_fan_fault: Indoor fan fault
+  name_outdoor_fan_fault: Outdoor fan fault
+  name_indoor_probe_fault: Indoor sensor fault
+  name_outdoor_probe_fault: Outdoor sensor fault
+  name_eeprom_error: EEPROM error
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.9.0           # needed for encrypted OTA updates
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret helty_api_key
+
+# Over-the-air updates are accepted only when encrypted with the API key
+ota:
+  - platform: esphome
+    encryption:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Fallback hotspot when the home Wi-Fi is unreachable. It has a password:
+  # without one, anyone nearby could reconfigure the device.
+  ap:
+    ssid: ${device_name}
+    password: !secret helty_ap_password
+
+captive_portal:
+
+# -- Modbus bus ---------------------------------------------------------------
+uart:
+  id: uart_helty
+  tx_pin: ${tx_pin}
+  rx_pin: ${rx_pin}
+  baud_rate: 19200
+  data_bits: 8
+  parity: NONE
+  stop_bits: 1
+
+modbus:
+  id: modbus_helty
+  uart_id: uart_helty
+  # no flow_control_pin: the base switches between transmit and receive by itself
+
+modbus_controller:
+  - id: helty
+    modbus_id: modbus_helty
+    address: ${modbus_address}
+    update_interval: 10s
+
+globals:
+  - id: vmc_status          # last value of HR 1000; -1 = not read yet
+    type: int
+    initial_value: '-1'
+  - id: last_speed          # last speed 1-4, to go back to when a preset ends
+    type: int
+    restore_value: true
+    initial_value: '1'
+  - id: syncing             # true while the fan is aligned to the VMC (avoids loops)
+    type: bool
+    initial_value: 'false'
+  - id: last_ok_ms          # time of the last successful read
+    type: uint32_t
+    initial_value: '0'
+  - id: ever_ok             # at least one successful read since boot
+    type: bool
+    initial_value: 'false'
+
+# -- Machine state (internal: the only place that writes HR 1000) -------------
+# The order of the options matches the register value: index == value.
+select:
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: vmc_mode
+    name: "Machine state"
+    internal: true
+    address: 1000
+    value_type: U_WORD
+    optimistic: true
+    optionsmap:
+      "Off": 0
+      "Speed 1": 1
+      "Speed 2": 2
+      "Speed 3": 3
+      "Speed 4": 4
+      "Hyper": 5
+      "Night": 6
+      "Free cooling": 7
+    on_value:
+      then:
+        - lambda: |-
+            // State of the VMC (read, or just commanded) -> align the fan
+            const int s = (int) i;
+            id(vmc_status) = s;
+            if (s >= 1 && s <= 4) id(last_speed) = s;
+            int sp = id(last_speed);
+            if (sp < 1 || sp > 4) sp = 1;
+
+            const bool want_on = (s != 0);
+            const char *want_preset = s == 5 ? "${name_hyper}" : s == 6 ? "${name_night}" : s == 7 ? "${name_free_cooling}" : nullptr;
+            const int want_speed = (s >= 1 && s <= 4) ? s : sp;
+
+            bool same = (id(vmc_fan).state == want_on);
+            if (!want_on) {
+              same = same && !id(vmc_fan).has_preset_mode() && id(vmc_fan).speed == 0;
+            } else if (want_preset != nullptr) {
+              same = same && id(vmc_fan).has_preset_mode() && id(vmc_fan).get_preset_mode() == want_preset;
+            } else {
+              same = same && !id(vmc_fan).has_preset_mode() && id(vmc_fan).speed == want_speed;
+            }
+            if (same) return;
+
+            id(syncing) = true;
+            if (!want_on) {
+              // off: setting a speed clears any preset,
+              // then the speed goes to 0 so Home Assistant shows 0%
+              auto call = id(vmc_fan).turn_off();
+              call.set_speed(sp);
+              call.perform();
+              id(vmc_fan).speed = 0;
+              id(vmc_fan).publish_state();
+            } else if (want_preset != nullptr) {
+              auto call = id(vmc_fan).turn_on();
+              call.set_preset_mode(want_preset);
+              call.perform();
+              if (id(vmc_fan).speed == 0) {
+                // turned on straight into a preset: show the last speed instead of 0%
+                id(vmc_fan).speed = sp;
+                id(vmc_fan).publish_state();
+              }
+            } else {
+              auto call = id(vmc_fan).turn_on();
+              call.set_speed(want_speed);
+              call.perform();
+            }
+            id(syncing) = false;
+
+# -- Fan: on/off, speed and presets -------------------------------------------
+fan:
+  - platform: template
+    id: vmc_fan
+    name: "${name_fan}"
+    speed_count: 4
+    preset_modes:
+      - "${name_hyper}"
+      - "${name_night}"
+      - "${name_free_cooling}"
+    restore_mode: NO_RESTORE   # never write to the VMC when the ESP boots
+    on_state:
+      then:
+        - lambda: |-
+            // Command from Home Assistant -> machine state to write
+            if (id(syncing) || id(vmc_status) < 0) return;
+            int target;
+            if (!id(vmc_fan).state) {
+              target = 0;
+            } else if (id(vmc_fan).has_preset_mode()) {
+              auto p = id(vmc_fan).get_preset_mode();
+              target = (p == "${name_hyper}") ? 5 : (p == "${name_night}") ? 6 : 7;
+            } else {
+              target = id(vmc_fan).speed;
+              // Turned on from off without choosing a speed: ESPHome takes the
+              // fan to full speed (4); here it starts again from the last one.
+              if (id(vmc_status) == 0 && target == 4) target = id(last_speed);
+              if (target < 1) target = id(last_speed);
+              if (target < 1 || target > 4) target = 1;
+            }
+            if (target == id(vmc_status)) return;
+            id(vmc_mode).make_call().set_index(target).perform();
+
+# -- Presets as switches (handy on dashboards and in automations) -------------
+switch:
+  - platform: template
+    id: sw_hyper
+    name: "${name_hyper}"
+    icon: mdi:fan-chevron-up
+    lambda: |-
+      if (id(vmc_status) < 0) return {};
+      return id(vmc_status) == 5;
+    turn_on_action:
+      - lambda: |-
+          if (id(vmc_status) >= 0 && id(vmc_status) != 5) id(vmc_mode).make_call().set_index(5).perform();
+    turn_off_action:
+      - lambda: |-
+          int sp = id(last_speed);
+          if (sp < 1 || sp > 4) sp = 1;
+          if (id(vmc_status) == 5) id(vmc_mode).make_call().set_index(sp).perform();
+
+  - platform: template
+    id: sw_notte
+    name: "${name_night}"
+    icon: mdi:weather-night
+    lambda: |-
+      if (id(vmc_status) < 0) return {};
+      return id(vmc_status) == 6;
+    turn_on_action:
+      - lambda: |-
+          if (id(vmc_status) >= 0 && id(vmc_status) != 6) id(vmc_mode).make_call().set_index(6).perform();
+    turn_off_action:
+      - lambda: |-
+          int sp = id(last_speed);
+          if (sp < 1 || sp > 4) sp = 1;
+          if (id(vmc_status) == 6) id(vmc_mode).make_call().set_index(sp).perform();
+
+  - platform: template
+    id: sw_free_cooling
+    name: "${name_free_cooling}"
+    icon: mdi:snowflake
+    lambda: |-
+      if (id(vmc_status) < 0) return {};
+      return id(vmc_status) == 7;
+    turn_on_action:
+      - lambda: |-
+          if (id(vmc_status) >= 0 && id(vmc_status) != 7) id(vmc_mode).make_call().set_index(7).perform();
+    turn_off_action:
+      - lambda: |-
+          int sp = id(last_speed);
+          if (sp < 1 || sp > 4) sp = 1;
+          if (id(vmc_status) == 7) id(vmc_mode).make_call().set_index(sp).perform();
+
+# -- Sensors -------------------------------------------------------------------
+sensor:
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_indoor_temperature}"
+    register_type: read
+    address: 1000
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    on_value:
+      then:
+        - lambda: |-
+            // every successful read confirms that the bus works
+            if (!std::isnan(x)) {
+              id(last_ok_ms) = millis();
+              id(ever_ok) = true;
+            }
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_outdoor_temperature}"
+    register_type: read
+    address: 1001
+    value_type: S_WORD          # signed: below zero in winter
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_alarm_code}"
+    register_type: read
+    address: 1006
+    value_type: U_WORD
+    accuracy_decimals: 0
+    icon: mdi:alert-circle-outline
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_firmware}"
+    register_type: read
+    address: 1012
+    value_type: U_WORD
+    accuracy_decimals: 0
+    icon: mdi:chip
+    entity_category: diagnostic
+
+  # Undocumented registers, exposed to work out what they mean (filter hours?)
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_register_1010}"
+    register_type: read
+    address: 1010
+    value_type: U_WORD
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_register_1014}"
+    register_type: read
+    address: 1014
+    value_type: U_WORD
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    disabled_by_default: true
+
+  - platform: wifi_signal
+    name: "${name_wifi_signal}"
+    update_interval: 60s
+    entity_category: diagnostic
+
+# -- Alarms (bits of IR 1006) and bus status -----------------------------------
+binary_sensor:
+  # Connected if a read succeeded in the last 35 s (about 3 cycles)
+  - platform: template
+    id: modbus_ok
+    name: "${name_modbus}"
+    device_class: connectivity
+    entity_category: diagnostic
+    lambda: |-
+      return id(ever_ok) && (millis() - id(last_ok_ms) < 35000);
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_filter_alarm}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0400
+    device_class: problem
+    icon: mdi:air-filter
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_frost_alarm}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0020
+    device_class: problem
+    icon: mdi:snowflake-alert
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_indoor_fan_fault}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0004
+    device_class: problem
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_outdoor_fan_fault}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0008
+    device_class: problem
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_indoor_probe_fault}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0001
+    device_class: problem
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_outdoor_probe_fault}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0002
+    device_class: problem
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    name: "${name_eeprom_error}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0010
+    device_class: problem
+    entity_category: diagnostic

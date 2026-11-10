@@ -1,0 +1,6 @@
+# ESPHome secrets (API key, Wi-Fi): never in the repository
+secrets.yaml
+.esphome/
+
+# macOS Finder metadata
+.DS_Store

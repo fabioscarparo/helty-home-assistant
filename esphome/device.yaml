@@ -1,0 +1,20 @@
+# Helty Flow40 - device file for ESPHome Device Builder
+# https://github.com/fabioscarparo/helty-home-assistant
+#
+# Paste this file into ESPHome Device Builder (Edit), then Install.
+# Before that, add the entries of secrets.yaml.example to your Secrets.
+
+substitutions:
+  device_name: helty-flow40       # host name on the network
+  friendly_name: Helty Flow40     # device name in Home Assistant
+  modbus_address: "2"             # Modbus address of the VMC (2 from the factory)
+
+packages:
+  helty_flow40:
+    url: https://github.com/fabioscarparo/helty-home-assistant
+    ref: main
+    refresh: 1d
+    files:
+      - esphome/helty-flow40.yaml
+      # Entity names in another language: remove the # from one line
+      # - esphome/locales/it.yaml
