@@ -4,26 +4,44 @@
  *
  * A Lovelace card that recalls the wall panel of the Helty Flow40, built
  * with the patterns of the core cards: power, ventilation with its four
- * speeds, Night, Hyper, Free cooling, the filter and the two temperatures. It works with the
- * ESPHome configuration of the same repository (1.0.0 or later), and finds
- * the entities of the device by type, device class and icon, so it keeps
- * working in any language and after a rename.
+ * speeds, Night, Hyper, Free cooling, the filter and the temperatures.
+ *
+ * It finds the entities by itself with the ESPHome configuration of the same
+ * repository (1.0.0 or later: by type, device class and icon) and with the
+ * Helty integration of Home Assistant for the smart units (by translation
+ * key), so it keeps working in any language and after a rename. Any other
+ * setup works with the entities chosen one by one.
  *
  * MIT License - Copyright (c) 2026 Fabio Scarparo
  */
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const CARD_TYPE = "helty-flow40-card";
 const EDITOR_TYPE = "helty-flow40-card-editor";
 const MODEL = "helty-flow40"; // from `project: name: fabioscarparo.helty-flow40`
+const HELTY = "helty"; // the Helty integration of Home Assistant, for the smart units
 const DEFAULT_COLOR = "light-blue";
 const NO_VALUE = new Set(["unavailable", "unknown", ""]);
 const PENDING_MS = 12000; // how long a command is shown before the unit confirms it
 const CYCLE_MS = 600; // repeated taps on the ventilation key are sent as one command
 
-// Entities of the device, recognized by domain, device class and the icon
-// set in helty-flow40.yaml. `entities:` in the card config overrides any of them.
-const ROLES = {
+// What each role of the card can be, for the entities chosen in the config
+const ROLE_DOMAINS = {
+  fan: ["fan"],
+  hyper: ["switch", "input_boolean"],
+  night: ["switch", "input_boolean"],
+  free_cooling: ["switch", "input_boolean"],
+  filter: ["binary_sensor", "button"],
+  frost: ["binary_sensor"],
+  modbus: ["binary_sensor"],
+  indoor: ["sensor"],
+  outdoor: ["sensor"],
+  humidity: ["sensor"],
+};
+
+// The ESPHome configuration of this repository: domain, device class and the
+// icon set in helty-flow40.yaml
+const ESPHOME_RULES = {
   fan: { domain: "fan" },
   hyper: { domain: "switch", icon: "mdi:fan-chevron-up" },
   night: { domain: "switch", icon: "mdi:weather-night" },
@@ -34,7 +52,24 @@ const ROLES = {
   indoor: { domain: "sensor", deviceClass: "temperature", icon: "mdi:home-thermometer" },
   outdoor: { domain: "sensor", deviceClass: "temperature", icon: "mdi:sun-thermometer" },
 };
+
+// The Helty integration of Home Assistant: translation keys
+const HELTY_KEYS = {
+  indoor_temperature: "indoor",
+  outdoor_temperature: "outdoor",
+  indoor_humidity: "humidity",
+  reset_filter: "filter",
+};
+
 const PRESETS = ["night", "hyper", "free_cooling"];
+// Preset modes of a fan that mean each preset, compared without case, spaces
+// and underscores: the ESPHome configuration in both languages, and the Helty
+// integration (night, boost, free_cooling)
+const PRESET_ALIASES = {
+  night: ["night", "notte", "sleep"],
+  hyper: ["hyper", "boost", "iperventilazione", "turbo"],
+  free_cooling: ["freecooling"],
+};
 
 // ---------------------------------------------------------------------------
 // Strings: Italian, English for any other language
@@ -57,20 +92,27 @@ const STRINGS = {
     filter: "Filter",
     indoor: "Indoor temperature",
     outdoor: "Outdoor temperature",
+    humidity: "Indoor humidity",
     indoor_short: "Indoor",
     outdoor_short: "Outdoor",
     offline_title: "The unit isn't answering",
     offline: "No reply over Modbus: check the power and the wiring of the module.",
+    offline_generic: "Home Assistant can't reach the unit: check its power and its connection.",
     filter_title: "Clean the filter",
     filter_text:
       "Clean or replace the filter, then reset the alarm on the unit's panel: hold ventilation and hyper together for 5 seconds, until all the LEDs blink twice.",
     frost_title: "Frost alarm",
     frost_text: "The unit is protecting itself from frost.",
     fault_title: "Fault",
-    no_device: "Choose your Helty Flow40 in the card settings.",
+    no_device: "Choose your Helty unit, or its fan entity, in the card settings.",
     no_fan:
-      "This device has no Helty Flow40 fan. The card needs the ESPHome configuration 1.0.0 or later from the helty-home-assistant repository.",
-    editor: { device_id: "Device", name: "Name", color: "Color" },
+      "No fan found for this unit. With the ESPHome configuration of the helty-home-assistant repository the card needs version 1.0.0 or later; with any other setup, choose the fan entity in the card settings.",
+    editor: {
+      device_id: "Device", name: "Name", color: "Color",
+      entities: "Entities", preset_modes: "Preset modes of the fan",
+      fan: "Fan", indoor: "Indoor temperature", outdoor: "Outdoor temperature", humidity: "Indoor humidity",
+      filter: "Filter", night: "Night", hyper: "Hyper", free_cooling: "Free cooling",
+    },
   },
   it: {
     name: "Helty Flow40",
@@ -88,20 +130,27 @@ const STRINGS = {
     filter: "Filtro",
     indoor: "Temperatura ambiente",
     outdoor: "Temperatura esterna",
+    humidity: "Umidità ambiente",
     indoor_short: "Ambiente",
     outdoor_short: "Esterna",
     offline_title: "La VMC non risponde",
     offline: "Nessuna risposta via Modbus: controlla l'alimentazione e i cavi del modulo.",
+    offline_generic: "Home Assistant non raggiunge la VMC: controlla l'alimentazione e la connessione.",
     filter_title: "Pulisci il filtro",
     filter_text:
       "Pulisci o sostituisci il filtro, poi azzera l'allarme dal pannello della VMC: tieni premuti insieme ventilazione e iperventilazione per 5 secondi, finché tutti i LED lampeggiano due volte.",
     frost_title: "Allarme ghiaccio",
     frost_text: "La VMC si sta proteggendo dal ghiaccio.",
     fault_title: "Guasto",
-    no_device: "Scegli la tua Helty Flow40 nelle impostazioni della scheda.",
+    no_device: "Scegli la tua VMC Helty, o la sua entità ventola, nelle impostazioni della scheda.",
     no_fan:
-      "Su questo dispositivo non c'è la ventola della Helty Flow40. La scheda richiede la configurazione ESPHome 1.0.0 o successiva del repository helty-home-assistant.",
-    editor: { device_id: "Dispositivo", name: "Nome", color: "Colore" },
+      "Nessuna ventola trovata per questa VMC. Con la configurazione ESPHome del repository helty-home-assistant la scheda richiede la versione 1.0.0 o successiva; con un'altra installazione, scegli l'entità ventola nelle impostazioni della scheda.",
+    editor: {
+      device_id: "Dispositivo", name: "Nome", color: "Colore",
+      entities: "Entità", preset_modes: "Preset della ventola",
+      fan: "Ventola", indoor: "Temperatura ambiente", outdoor: "Temperatura esterna", humidity: "Umidità ambiente",
+      filter: "Filtro", night: "Notte", hyper: "Hyper", free_cooling: "Free cooling",
+    },
   },
 };
 
@@ -136,34 +185,43 @@ function deviceName(hass, deviceId) {
   return device?.name_by_user || device?.name || "";
 }
 
-// The entities of the device, by role. Overrides from the config win.
-function resolveEntities(hass, deviceId, overrides) {
+// The entities of the device, by role: the Helty integration by translation
+// key, the ESPHome configuration by domain, device class and icon. Entities
+// chosen in the config win, and with no device they are the only ones.
+function resolveEntities(hass, deviceId, chosen) {
   const found = {};
   const temperatures = [];
   const problems = [];
-  for (const entry of Object.values(hass.entities || {})) {
-    if (entry.device_id !== deviceId) continue;
-    const id = entry.entity_id;
-    const domain = id.split(".")[0];
-    const attributes = hass.states[id]?.attributes || {};
-    if (attributes.restored) continue; // left behind by an older configuration
-    for (const [role, rule] of Object.entries(ROLES)) {
-      if (found[role] || rule.domain !== domain) continue;
-      if (rule.icon && rule.icon !== attributes.icon) continue;
-      if (rule.deviceClass && rule.deviceClass !== attributes.device_class) continue;
-      found[role] = id;
-      break;
+  if (deviceId) {
+    for (const entry of Object.values(hass.entities || {})) {
+      if (entry.device_id !== deviceId) continue;
+      const id = entry.entity_id;
+      const domain = id.split(".")[0];
+      const attributes = hass.states[id]?.attributes || {};
+      if (attributes.restored) continue; // left behind by an older configuration
+      if (entry.platform === HELTY) {
+        const role = domain === "fan" ? "fan" : HELTY_KEYS[entry.translation_key];
+        if (role && !found[role]) found[role] = id;
+        continue;
+      }
+      for (const [role, rule] of Object.entries(ESPHOME_RULES)) {
+        if (found[role] || rule.domain !== domain) continue;
+        if (rule.icon && rule.icon !== attributes.icon) continue;
+        if (rule.deviceClass && rule.deviceClass !== attributes.device_class) continue;
+        found[role] = id;
+        break;
+      }
+      if (domain === "sensor" && attributes.device_class === "temperature") temperatures.push(id);
+      if (domain === "binary_sensor" && attributes.device_class === "problem") problems.push(id);
     }
-    if (domain === "sensor" && attributes.device_class === "temperature") temperatures.push(id);
-    if (domain === "binary_sensor" && attributes.device_class === "problem") problems.push(id);
+    // Configurations older than 1.0.0 have no icons on the temperatures: they are
+    // registered in the order of the YAML, indoor first.
+    const spare = temperatures.filter((id) => id !== found.indoor && id !== found.outdoor);
+    if (!found.indoor && spare.length) found.indoor = spare.shift();
+    if (!found.outdoor && spare.length) found.outdoor = spare.shift();
   }
-  // Configurations older than 1.0.0 have no icons on the temperatures: they are
-  // registered in the order of the YAML, indoor first.
-  const spare = temperatures.filter((id) => id !== found.indoor && id !== found.outdoor);
-  if (!found.indoor && spare.length) found.indoor = spare.shift();
-  if (!found.outdoor && spare.length) found.outdoor = spare.shift();
-  for (const [role, id] of Object.entries(overrides || {})) {
-    if (ROLES[role] && typeof id === "string" && id.startsWith(`${ROLES[role].domain}.`)) found[role] = id;
+  for (const [role, id] of Object.entries(chosen || {})) {
+    if (typeof id === "string" && ROLE_DOMAINS[role]?.includes(id.split(".")[0])) found[role] = id;
   }
   found.problems = problems.filter((id) => id !== found.filter && id !== found.frost);
   return found;
@@ -176,9 +234,22 @@ function speedOf(fanState) {
   return Math.min(4, Math.max(1, Math.round(percentage / step)));
 }
 
+const norm = (value) => String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+// The preset mode of the fan behind each preset: the one chosen in the config,
+// else the one whose name means it
+function presetModes(fanState, chosen) {
+  const modes = fanState?.attributes?.preset_modes || [];
+  const result = {};
+  for (const preset of PRESETS) {
+    result[preset] = chosen?.[preset] || modes.find((mode) => PRESET_ALIASES[preset].includes(norm(mode)));
+  }
+  return result;
+}
+
 // What the panel shows: unavailable, off, on (waiting), speed1-4, night, hyper,
-// free_cooling, or preset (a preset without its switch).
-function modeOf(hass, ents) {
+// free_cooling, or preset (a preset mode the card doesn't know).
+function modeOf(hass, ents, presets) {
   const fan = hass.states[ents.fan];
   if (!fan || NO_VALUE.has(fan.state)) return "unavailable";
   if (ents.modbus && hass.states[ents.modbus]?.state === "off") return "unavailable";
@@ -186,7 +257,8 @@ function modeOf(hass, ents) {
   for (const preset of PRESETS) {
     if (ents[preset] && hass.states[ents[preset]]?.state === "on") return preset;
   }
-  if (fan.attributes?.preset_mode) return "preset";
+  const current = fan.attributes?.preset_mode;
+  if (current) return PRESETS.find((preset) => presets[preset] && norm(presets[preset]) === norm(current)) ?? "preset";
   return `speed${speedOf(fan) || 1}`;
 }
 
@@ -438,7 +510,7 @@ class HeltyFlow40Card extends HTMLElement {
   _changed(old, hass) {
     if (old.entities !== hass.entities || old.devices !== hass.devices || old.locale !== hass.locale || old.language !== hass.language || old.themes !== hass.themes) return true;
     const ents = this._ents || {};
-    const watched = [...Object.keys(ROLES).map((role) => ents[role]), ...(ents.problems || [])];
+    const watched = [...Object.keys(ROLE_DOMAINS).map((role) => ents[role]), ...(ents.problems || [])];
     return watched.some((id) => id && old.states[id] !== hass.states[id]);
   }
 
@@ -451,7 +523,7 @@ class HeltyFlow40Card extends HTMLElement {
     this._ents = resolveEntities(hass, this._config.device_id, this._config.entities);
     this._entsKey = key;
     this._entsStates = states;
-    this._entsComplete = Object.keys(ROLES).every((role) => this._ents[role]);
+    this._entsComplete = !this._config.device_id || Object.keys(ESPHOME_RULES).every((role) => this._ents[role]);
   }
 
   _t(key, vars) {
@@ -464,16 +536,20 @@ class HeltyFlow40Card extends HTMLElement {
     if (!hass || !config) return;
     this._renders += 1;
 
-    if (!config.device_id) return this._showMessage(this._t("no_device"));
+    if (!config.device_id && !config.entities?.fan) return this._showMessage(this._t("no_device"));
     this._resolve();
     const ents = this._ents;
-    if (!ents.fan) return this._showMessage(this._t("no_fan"));
+    if (!ents.fan) return this._showMessage(this._t(config.device_id ? "no_fan" : "no_device"));
     this._message.hidden = true;
     this._header.hidden = false;
     this._panel.hidden = false;
 
-    const actual = modeOf(hass, ents);
+    const presets = presetModes(hass.states[ents.fan], config.preset_modes);
+    this._presets = presets;
+    const actual = modeOf(hass, ents, presets);
     this._actual = actual;
+    // the speed to go back to when a preset ends, if the fan doesn't keep it
+    if (actual.startsWith("speed")) this._lastSpeed = Number(actual.slice(5));
     if (this._pending && (Date.now() > this._pending.until || actual === "unavailable" || this._pending.done(actual))) {
       this._pending = null;
     }
@@ -484,7 +560,7 @@ class HeltyFlow40Card extends HTMLElement {
 
     // Header
     const fanState = hass.states[ents.fan];
-    const name = config.name || deviceName(hass, config.device_id) || this._t("name");
+    const name = config.name || deviceName(hass, config.device_id) || fanState?.attributes?.friendly_name || this._t("name");
     root.querySelector(".primary").textContent = name;
     root.querySelector(".secondary").textContent = this._modeLabel(mode);
     root.querySelector(".tile-info").setAttribute("aria-label", `${name}: ${this._modeLabel(mode)}`);
@@ -500,7 +576,10 @@ class HeltyFlow40Card extends HTMLElement {
       const el = this._panel.querySelector(`.reading[data-role="${role}"]`);
       const stateObj = ents[role] && hass.states[ents[role]];
       el.disabled = !stateObj;
-      const value = !stateObj || NO_VALUE.has(stateObj.state) ? "-" : this._format(stateObj);
+      let value = !stateObj || NO_VALUE.has(stateObj.state) ? "-" : this._format(stateObj);
+      // the indoor humidity, where the unit measures it, next to the indoor temperature
+      const humidity = role === "indoor" && ents.humidity && hass.states[ents.humidity];
+      if (humidity && !NO_VALUE.has(humidity.state)) value += ` · ${this._format(humidity)}`;
       el.querySelector(".label").textContent = this._t(`${role}_short`);
       el.querySelector(".value").textContent = value;
       el.setAttribute("aria-label", `${this._t(role)}: ${value}`);
@@ -520,7 +599,7 @@ class HeltyFlow40Card extends HTMLElement {
     };
     setControl('[data-action="ventilation"]', mode.startsWith("speed"), this._t("ventilation_name"), this._t("ventilation"));
     for (const preset of PRESETS) {
-      setControl(`[data-preset="${preset}"]`, mode === preset, this._t(preset), this._t(preset), !ents[preset]);
+      setControl(`[data-preset="${preset}"]`, mode === preset, this._t(preset), this._t(preset), !ents[preset] && !presets[preset]);
     }
 
     // The speeds fill up like the LEDs of the panel: speed 3 fills 1, 2 and 3.
@@ -529,7 +608,7 @@ class HeltyFlow40Card extends HTMLElement {
     const bar = mode.startsWith("speed") ? Number(mode.slice(5))
       : mode === "hyper" ? 4
       : mode === "night" ? 1
-      : mode === "free_cooling" || mode === "preset" ? speedOf(fanState) || 1
+      : mode === "free_cooling" || mode === "preset" ? speedOf(fanState) || this._lastSpeed || 1
       : 0;
     for (const n of [1, 2, 3, 4]) {
       const el = this._panel.querySelector(`[data-speed="${n}"]`);
@@ -541,8 +620,9 @@ class HeltyFlow40Card extends HTMLElement {
       el.disabled = offline;
     }
 
-    // Filter: amber while it needs cleaning
-    const filterOn = !offline && hass.states[ents.filter]?.state === "on";
+    // Filter: amber while it needs cleaning. With the Helty integration it's the
+    // button that resets the filter counter, and opens its dialog.
+    const filterOn = !offline && Boolean(ents.filter?.startsWith("binary_sensor.")) && hass.states[ents.filter]?.state === "on";
     const filter = this._panel.querySelector('[data-role="filter"]');
     filter.classList.toggle("alarm", filterOn);
     filter.querySelector(".name").textContent = this._t("filter");
@@ -552,10 +632,10 @@ class HeltyFlow40Card extends HTMLElement {
 
     // Alerts
     const alerts = [];
-    if (offline) alerts.push(["error", "mdi:lan-disconnect", this._t("offline_title"), this._t("offline")]);
+    if (offline) alerts.push(["error", "mdi:lan-disconnect", this._t("offline_title"), this._t(ents.modbus ? "offline" : "offline_generic")]);
     if (filterOn) alerts.push(["warning", "mdi:air-filter", this._t("filter_title"), this._t("filter_text")]);
     if (!offline && hass.states[ents.frost]?.state === "on") alerts.push(["warning", "mdi:snowflake-alert", this._t("frost_title"), this._t("frost_text")]);
-    if (!offline) {
+    if (!offline && ents.problems.length) {
       const prefix = `${deviceName(hass, config.device_id)} `;
       const faults = ents.problems
         .filter((id) => hass.states[id]?.state === "on")
@@ -623,13 +703,19 @@ class HeltyFlow40Card extends HTMLElement {
     } else if (action === "preset") {
       const preset = el.dataset.preset;
       const entityId = this._ents[preset];
-      if (!entityId) return;
+      const presetMode = this._presets?.[preset];
+      if (!entityId && !presetMode) return;
+      const domain = entityId?.split(".")[0];
       if (mode === preset) {
-        // the switch goes back to the last speed used, which the fan keeps during a preset
-        const speed = speedOf(this._hass.states[fan]) || 1;
-        this._command(`speed${speed}`, "switch", "turn_off", { entity_id: entityId }, (a) => a !== preset);
+        // back to the last speed: the switch of the ESPHome configuration knows
+        // it, otherwise the card sets it on the fan
+        const speed = speedOf(this._hass.states[fan]) || this._lastSpeed || 1;
+        if (entityId) this._command(`speed${speed}`, domain, "turn_off", { entity_id: entityId }, (a) => a !== preset);
+        else this._command(`speed${speed}`, "fan", "set_percentage", { entity_id: fan, percentage: this._percentage(speed) }, (a) => a !== preset);
+      } else if (entityId) {
+        this._command(preset, domain, "turn_on", { entity_id: entityId });
       } else {
-        this._command(preset, "switch", "turn_on", { entity_id: entityId });
+        this._command(preset, "fan", "set_preset_mode", { entity_id: fan, preset_mode: presetMode });
       }
     }
   }
@@ -650,7 +736,7 @@ class HeltyFlow40Card extends HTMLElement {
   _cycleSpeed(mode) {
     const fan = this._ents.fan;
     const current = mode.startsWith("speed") ? Number(mode.slice(5)) : mode === "off" ? 0 : -1;
-    const next = current < 0 ? speedOf(this._hass.states[fan]) || 1 : current === 4 ? 0 : current + 1;
+    const next = current < 0 ? speedOf(this._hass.states[fan]) || this._lastSpeed || 1 : current === 4 ? 0 : current + 1;
     this._setPending(next ? `speed${next}` : "off");
     clearTimeout(this._cycleTimer);
     this._cycleTimer = setTimeout(() => {
@@ -684,14 +770,14 @@ class HeltyFlow40Card extends HTMLElement {
   }
 }
 
-// The Flow40 to offer first: the model set by the ESPHome project, else the
-// first ESPHome device with a fan.
+// The unit to offer first: the model set by the ESPHome project, else a unit
+// of the Helty integration, else the first ESPHome device with a fan.
 function findDevice(hass) {
   const devices = Object.values(hass?.devices || {});
   const byModel = devices.find((d) => d.model === MODEL);
   if (byModel) return byModel.id;
-  const fan = Object.values(hass?.entities || {}).find((e) => e.platform === "esphome" && e.entity_id.startsWith("fan.") && e.device_id);
-  return fan?.device_id;
+  const fans = Object.values(hass?.entities || {}).filter((e) => e.entity_id.startsWith("fan.") && e.device_id);
+  return (fans.find((e) => e.platform === HELTY) || fans.find((e) => e.platform === "esphome"))?.device_id;
 }
 
 // ---------------------------------------------------------------------------
@@ -728,9 +814,19 @@ class HeltyFlow40CardEditor extends HTMLElement {
       this._form = document.createElement("ha-form");
       this._form.addEventListener("value-changed", (ev) => {
         const config = { ...ev.detail.value };
-        for (const key of Object.keys(config)) {
-          if (config[key] === "" || config[key] === undefined) delete config[key];
-        }
+        // keep the YAML short: no empty values, no empty groups
+        const clean = (object) => {
+          for (const key of Object.keys(object)) {
+            if (object[key] && typeof object[key] === "object" && !Array.isArray(object[key])) {
+              object[key] = clean({ ...object[key] });
+              if (!Object.keys(object[key]).length) delete object[key];
+            } else if (object[key] === "" || object[key] === undefined || object[key] === null) {
+              delete object[key];
+            }
+          }
+          return object;
+        };
+        clean(config);
         if (config.color === DEFAULT_COLOR) delete config.color;
         this._config = config;
         fire(this, "config-changed", { config });
@@ -739,10 +835,30 @@ class HeltyFlow40CardEditor extends HTMLElement {
     }
     this._form.hass = this._hass;
     this._form.data = { color: DEFAULT_COLOR, ...this._config };
+    const t = (key) => translate(this._hass, `editor.${key}`);
+    const entity = (name, filter) => ({ name, selector: { entity: { filter } } });
+    const presetSwitch = { domain: ["switch", "input_boolean"] };
     this._form.schema = [
-      { name: "device_id", required: true, selector: { device: { filter: [{ integration: "esphome", model: MODEL }] } } },
+      { name: "device_id", selector: { device: { filter: [{ integration: "esphome", model: MODEL }, { integration: HELTY }] } } },
       { name: "name", selector: { text: {} } },
       { name: "color", selector: { ui_color: { default_color: DEFAULT_COLOR } } },
+      {
+        name: "entities", type: "expandable", title: t("entities"), icon: "mdi:format-list-bulleted",
+        schema: [
+          entity("fan", { domain: "fan" }),
+          entity("indoor", { domain: "sensor", device_class: "temperature" }),
+          entity("outdoor", { domain: "sensor", device_class: "temperature" }),
+          entity("humidity", { domain: "sensor", device_class: "humidity" }),
+          entity("filter", [{ domain: "binary_sensor" }, { domain: "button" }]),
+          entity("night", presetSwitch),
+          entity("hyper", presetSwitch),
+          entity("free_cooling", presetSwitch),
+        ],
+      },
+      {
+        name: "preset_modes", type: "expandable", title: t("preset_modes"), icon: "mdi:tune-variant",
+        schema: PRESETS.map((name) => ({ name, selector: { text: {} } })),
+      },
     ];
     this._form.computeLabel = (schema) => translate(this._hass, `editor.${schema.name}`);
   }

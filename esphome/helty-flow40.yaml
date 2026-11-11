@@ -10,6 +10,8 @@
 #   Hyper, Night, Free cooling   switches, mutually exclusive. Turning a
 #                  preset off goes back to the last speed used.
 #   Temperatures, alarms, Modbus communication, diagnostics
+#   Estimated power   W from the Flow40 datasheet, by operating mode: the unit
+#                  has no power meter
 #
 # Registers checked on a Flow40 (firmware 117, PID 0x1102):
 #   IR 1000  indoor temperature     x0.1 °C
@@ -52,6 +54,18 @@ substitutions:
   name_indoor_probe_fault: Indoor sensor fault
   name_outdoor_probe_fault: Outdoor sensor fault
   name_eeprom_error: EEPROM error
+  name_power: Estimated power
+
+  # Power drawn by the Flow40 in each mode, in W, from the Helty datasheet
+  # (Flow30-40 MY25). Free cooling is a bypass at the speed in use, so it
+  # draws the power of that speed. Standby is not in the datasheet.
+  power_off: "0"
+  power_night: "2"
+  power_speed_1: "4"
+  power_speed_2: "6"
+  power_speed_3: "9"
+  power_speed_4: "18"
+  power_hyper: "20"
 
 esphome:
   name: ${device_name}
@@ -61,7 +75,7 @@ esphome:
   # The dashboard card finds the unit by this model.
   project:
     name: fabioscarparo.helty-flow40
-    version: "1.0.0"
+    version: "1.1.0"
 
 esp32:
   board: m5stack-atom
@@ -197,6 +211,7 @@ select:
               call.perform();
             }
             id(syncing) = false;
+            id(power_estimate).update();  // the new mode, the new power
 
 # -- Fan: on/off, speed and presets -------------------------------------------
 fan:
@@ -359,6 +374,30 @@ sensor:
     accuracy_decimals: 0
     entity_category: diagnostic
     disabled_by_default: true
+
+  # Estimated from the mode, since the unit has no power meter. Unknown while
+  # the unit doesn't answer. For kWh, add an Integral helper in Home Assistant.
+  - platform: template
+    id: power_estimate
+    name: "${name_power}"
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: |-
+      if (!id(ever_ok) || millis() - id(last_ok_ms) >= 35000) return NAN;
+      const float speed[] = {${power_speed_1}, ${power_speed_2}, ${power_speed_3}, ${power_speed_4}};
+      int sp = id(last_speed);
+      if (sp < 1 || sp > 4) sp = 1;
+      switch (id(vmc_status)) {
+        case 0: return ${power_off};
+        case 1: case 2: case 3: case 4: return speed[id(vmc_status) - 1];
+        case 5: return ${power_hyper};
+        case 6: return ${power_night};
+        case 7: return speed[sp - 1];  // free cooling runs at the speed in use
+        default: return NAN;
+      }
 
   - platform: wifi_signal
     name: "${name_wifi_signal}"

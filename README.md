@@ -48,6 +48,7 @@ It is designed to be simple and inexpensive to build:
 | Ventilation | Fan | On/off, 4 fan speeds, plus *Hyper*, *Night*, and *Free cooling* presets |
 | Hyper, Night, Free cooling | Switches | Activate a preset. Presets are mutually exclusive; turning one off restores the previous fan speed |
 | Indoor and outdoor temperature | Sensors | In °C, with 0.1 °C resolution |
+| Estimated power | Sensor | In W, from the Flow40 datasheet for the running mode: night 2 W, speed 1-4 4, 6, 9 and 18 W, hyper 20 W. The unit has no power meter. Not shown on the card |
 | Filter alarm, frost alarm, indoor/outdoor fan fault | Binary sensors | Read directly from the unit's alarm register |
 | Modbus communication | Diagnostic | Reports *Connected* if the unit has responded within the last 35 seconds |
 | Alarm code, firmware version, Wi-Fi signal, sensor faults, EEPROM error | Diagnostic | For system status and troubleshooting |
@@ -205,11 +206,17 @@ Install the [Helty Flow40 card](#dashboard-card) for a dashboard interface model
 ## Dashboard card
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/card-dark.png">
-  <img alt="The Helty Flow40 card at speed 2, in Night mode, and in Free cooling with the filter alarm" src="images/card-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="images/wall-dark.svg">
+  <img alt="The Helty Flow40 card at speed 2, in Night, Hyper and Free cooling, off, with the filter alarm, a fault and the unit not answering, and two smart units of the Helty integration with the indoor humidity" src="images/wall-light.svg">
 </picture>
 
 The **Helty Flow40 card** mirrors the physical wall panel of the unit, using the same icons and layout, plus direct speed buttons next to the ventilation button. Built to match Home Assistant's native tile cards, it automatically adapts to light/dark themes and your profile's language.
+
+It works with three setups:
+
+- **This project's ESPHome firmware**: the card finds the unit and all its entities by itself.
+- **The [Helty integration](https://www.home-assistant.io/integrations/helty/) of Home Assistant**, for the smart units with Wi-Fi: the card finds them by itself too, drives the fan's presets and shows the indoor humidity next to the temperature.
+- **Any other setup**: pick the fan and the other entities one by one in the card editor.
 
 | Control | Action |
 |---|---|
@@ -221,12 +228,12 @@ The **Helty Flow40 card** mirrors the physical wall panel of the unit, using the
 | Night | Activates quiet minimum speed; tap again to return to the previous speed |
 | Hyper | Activates maximum airflow (all four speed indicators lit); tap again to return to the previous speed |
 | Free cooling | Toggles free cooling mode on or off |
-| Filter | Highlights in amber when the filter needs cleaning, with the reset steps in the banner below |
+| Filter | Highlights in amber when the filter needs cleaning, with the reset steps in the banner below. With the Helty integration, it opens the Reset filter button |
 
 The card also displays clear banners if Modbus communication is lost, or if a frost alarm or hardware fault occurs.
 
 > [!IMPORTANT]
-> The card requires version **1.0.0** or later of the ESPHome configuration, as it auto-discovers the device by its model attribute and maps entities by their default icons. If you flashed an earlier version, update your device via **Install → Wirelessly**.
+> With this project's firmware, the card requires version **1.0.0** or later of the ESPHome configuration, as it auto-discovers the device by its model attribute and maps entities by their default icons. If you flashed an earlier version, update your device via **Install → Wirelessly**.
 
 ### Install via HACS
 
@@ -247,7 +254,7 @@ Because the card is not in the default HACS store yet, add this repository as a 
 
 1. Open a dashboard and click **Edit dashboard** (pencil icon).
 2. Click **Add card** and search for **Helty Flow40**.
-3. Select your unit from the dropdown in the visual editor and save.
+3. Select your unit from the dropdown in the visual editor and save. With any other setup, leave the device empty and pick the entities under **Entities**.
 
 ```yaml
 type: custom:helty-flow40-card
@@ -263,7 +270,26 @@ entities:
   night: switch.helty_flow40_night
 ```
 
-Supported entity keys: `fan`, `hyper`, `night`, `free_cooling`, `filter`, `frost`, `modbus`, `indoor`, and `outdoor`.
+With any other setup, the entities alone are enough, without a device:
+
+```yaml
+type: custom:helty-flow40-card
+entities:
+  fan: fan.living_room_vmc
+  indoor: sensor.living_room_temperature
+preset_modes:       # optional: the fan's preset modes, if the card doesn't recognize them
+  night: Sleep
+  hyper: Boost
+```
+
+| Key | Entity |
+|---|---|
+| `fan` | The fan: on and off, speed and preset modes |
+| `night`, `hyper`, `free_cooling` | Switches for the presets. Without them, the card uses the fan's preset modes: it recognizes `night`, `boost`, `free_cooling` and the names of this project's firmware, or the ones in `preset_modes` |
+| `indoor`, `outdoor` | Temperature sensors |
+| `humidity` | Indoor humidity, shown next to the indoor temperature |
+| `filter` | A binary sensor for the filter alarm, or a button that resets the filter |
+| `frost`, `modbus` | Frost alarm and connection, binary sensors |
 
 ## Language support
 
@@ -317,6 +343,7 @@ The ESP polls the unit every 10 seconds over Modbus RTU (19200 baud, 8N1):
 - **Zero writes on boot**: Entities remain `unknown` until the first polling cycle completes (~10 seconds after boot).
 - **Smart turn-on behavior**: Turning the fan on without specifying a speed restores the last active speed rather than defaulting to maximum.
 - **Preset memory**: Turning off an active preset restores the previous fan speed.
+- **Estimated power**: the unit has no power meter, so the firmware reports the power of the running mode from the Flow40 datasheet. Free cooling is a bypass at the speed in use, so it reports that speed. The values are substitutions at the top of [`helty-flow40.yaml`](esphome/helty-flow40.yaml); to get kWh for the Energy dashboard, see [docs/home-assistant.md](docs/home-assistant.md#energy).
 - **Alarm code `20480` (`0x5000`) is normal**: These bits indicate "no humidity sensor" and "no CO₂ sensor", which are always set on the base Flow40 model.
 - **Resetting the filter alarm**: After cleaning or replacing the filter, press and hold the **Ventilation** and **Hyper** buttons simultaneously on the unit's wall panel for 5 seconds until all LEDs blink twice.
 

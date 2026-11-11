@@ -13,6 +13,7 @@ device named **Helty Flow40**, with English names. Check yours in
 | Temperatures | `sensor.helty_flow40_indoor_temperature`, `sensor.helty_flow40_outdoor_temperature` |
 | Filter alarm | `binary_sensor.helty_flow40_filter_alarm` |
 | Modbus communication | `binary_sensor.helty_flow40_modbus_communication` |
+| Estimated power | `sensor.helty_flow40_estimated_power` |
 
 ## Dashboard
 
@@ -52,6 +53,24 @@ entities:
   - entity: binary_sensor.helty_flow40_modbus_communication
     name: Connection
 ```
+
+## Energy
+
+The **Estimated power** sensor gives the watts of the running mode, from the
+Flow40 datasheet. To see the energy in kWh, and the unit in the Energy
+dashboard, add an **Integral** helper:
+
+1. **Settings → Devices & services → Helpers → Create helper → Integral
+   sensor**.
+2. Name it, for example, **Ventilation energy**, choose
+   **Estimated power** as the input sensor, **Left** as the integration
+   method (the power changes in steps, when the mode changes), **k** as the
+   metric prefix and **Hours** as the time unit.
+3. In **Settings → Dashboards → Energy**, add the new sensor under
+   **Individual devices**.
+
+It's an estimate: the datasheet values are measured by Helty on a new unit,
+and the standby draw of the unit isn't in the datasheet.
 
 ## Automations
 

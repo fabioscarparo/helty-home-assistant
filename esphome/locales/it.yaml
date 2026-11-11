@@ -21,3 +21,4 @@ substitutions:
   name_indoor_probe_fault: Guasto sonda interna
   name_outdoor_probe_fault: Guasto sonda esterna
   name_eeprom_error: Errore EEPROM
+  name_power: Potenza stimata
