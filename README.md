@@ -203,6 +203,36 @@ At this stage, the logs will show Modbus timeouts: this is normal since the unit
 
 Install the [Helty Flow40 card](#dashboard-card) for a dashboard interface modeled after the unit's wall panel. Alternatively, [docs/home-assistant.md](docs/home-assistant.md) provides a layout built purely with stock Home Assistant cards, along with ready-to-use automations (scheduled night mode, filter maintenance reminders, automatic summer free cooling, and offline alerts).
 
+## More than one unit
+
+Each Flow40 gets its own ATOM Lite and RS485 base, wired to its own terminal block and powered by its own 24 V: repeat the installation for every unit. Only a few things change from one unit to the next:
+
+- **A new device for each ATOM**: in ESPHome Device Builder, select **+ New device** again and give each unit its own `device_name` and `friendly_name`, so the entity IDs and the fallback hotspot don't clash:
+
+  ```yaml
+  substitutions:
+    device_name: helty-bedroom
+    friendly_name: Bedroom ventilation
+    modbus_address: "2"
+  ```
+
+  Keep the `packages:` block of [`device.yaml`](esphome/device.yaml) as it is.
+- **A first flash over USB for each ATOM**: after that, every unit updates over Wi-Fi.
+- **The same Modbus address**: each unit sits on its own bus, so they can all keep the factory address `2`.
+
+The Secrets are shared: every unit uses the same `helty_api_key` and `helty_ap_password`, and Home Assistant asks for the key once per unit. To give a unit its own key, add this to its YAML and the matching entry to the Secrets:
+
+```yaml
+api:
+  encryption:
+    key: !secret helty_bedroom_api_key
+```
+
+On the dashboard, add one card per unit and pick its device in the editor. For kWh, create one Integral helper per unit from its **Estimated power**.
+
+> [!NOTE]
+> One ATOM per unit is the supported setup. A single ATOM driving several units on one RS-485 bus would need a cable between the rooms and a different Modbus address on every unit, while they all leave the factory with address `2`.
+
 ## Dashboard card
 
 <picture>
