@@ -75,7 +75,7 @@ esphome:
   # The dashboard card finds the unit by this model.
   project:
     name: fabioscarparo.helty-flow40
-    version: "1.1.0"
+    version: "1.1.1"
 
 esp32:
   board: m5stack-atom

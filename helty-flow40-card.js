@@ -15,7 +15,7 @@
  * MIT License - Copyright (c) 2026 Fabio Scarparo
  */
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 const CARD_TYPE = "helty-flow40-card";
 const EDITOR_TYPE = "helty-flow40-card-editor";
 const MODEL = "helty-flow40"; // from `project: name: fabioscarparo.helty-flow40`

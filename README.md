@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/header.svg" alt="Helty Home Assistant" width="600">
+  <img src="https://raw.githubusercontent.com/fabioscarparo/helty-home-assistant/main/images/header.svg" alt="Helty Home Assistant" width="600">
 </p>
 
 <p align="center">
@@ -11,7 +11,7 @@
   <a href="https://esphome.io/"><img alt="ESPHome 2026.9+" src="https://img.shields.io/badge/ESPHome-2026.9%2B-000?logo=esphome&logoColor=fff"></a>
   <a href="https://www.home-assistant.io/"><img alt="Home Assistant" src="https://img.shields.io/badge/Home_Assistant-18BCF2?logo=homeassistant&logoColor=fff"></a>
   <a href="#dashboard-card"><img alt="HACS Custom" src="https://img.shields.io/badge/HACS-Custom-41BDF5?logo=homeassistantcommunitystore&logoColor=fff"></a>
-  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/License-MIT-333"></a>
+  <a href="https://github.com/fabioscarparo/helty-home-assistant/blob/main/LICENSE"><img alt="MIT" src="https://img.shields.io/badge/License-MIT-333"></a>
 </p>
 
 The **Helty Flow40** is a single-room heat recovery ventilation unit (known in
@@ -36,7 +36,7 @@ It is designed to be simple and inexpensive to build:
   after the unit's wall panel, designed to blend seamlessly with core Home Assistant cards.
 
 <p align="center">
-  <img src="images/installation.jpg" alt="A Flow40 with its front cover off: four wires run from the green terminal block to the ATOM Lite on its RS485 base, tucked in the bottom of the casing" width="420">
+  <img src="https://raw.githubusercontent.com/fabioscarparo/helty-home-assistant/main/images/installation.jpg" alt="A Flow40 with its front cover off: four wires run from the green terminal block to the ATOM Lite on its RS485 base, tucked in the bottom of the casing" width="420">
 </p>
 
 ---
@@ -165,7 +165,7 @@ At this stage, the logs will show Modbus timeouts: this is normal since the unit
 > Disconnect the ventilation unit from mains power before opening the cover and wiring.
 
 <p align="center">
-  <img src="images/wiring.svg" alt="Wiring: terminal 1 to G, terminal 2 to DC 24V, terminal 4 to A, terminal 5 to B" width="720">
+  <img src="https://raw.githubusercontent.com/fabioscarparo/helty-home-assistant/main/images/wiring.svg" alt="Wiring: terminal 1 to G, terminal 2 to DC 24V, terminal 4 to A, terminal 5 to B" width="720">
 </p>
 
 | Flow40 terminal | Signal | Atomic RS485 Base |
@@ -236,8 +236,8 @@ On the dashboard, add one card per unit and pick its device in the editor. For k
 ## Dashboard card
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/wall-dark.svg">
-  <img alt="The Helty Flow40 card at speed 2, in Night, Hyper and Free cooling, off, with the filter alarm, a fault and the unit not answering, and two smart units of the Helty integration with the indoor humidity" src="images/wall-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/fabioscarparo/helty-home-assistant/main/images/wall-dark.svg">
+  <img alt="The Helty Flow40 card at speed 2, in Night, Hyper and Free cooling, off, with the filter alarm, a fault and the unit not answering, and two smart units of the Helty integration with the indoor humidity" src="https://raw.githubusercontent.com/fabioscarparo/helty-home-assistant/main/images/wall-light.svg">
 </picture>
 
 The **Helty Flow40 card** mirrors the physical wall panel of the unit, using the same icons and layout, plus direct speed buttons next to the ventilation button. Built to match Home Assistant's native tile cards, it automatically adapts to light/dark themes and your profile's language.
@@ -267,7 +267,11 @@ The card also displays clear banners if Modbus communication is lost, or if a fr
 
 ### Install via HACS
 
-Because the card is not in the default HACS store yet, add this repository as a custom repository:
+Because the card is not in the default HACS store yet, add this repository as a custom repository. The button below opens it in HACS on your Home Assistant:
+
+[![Open the repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fabioscarparo&repository=helty-home-assistant&category=plugin)
+
+Or add it by hand:
 
 1. Open **HACS**, then click **⋮ → Custom repositories**.
 2. Paste `https://github.com/fabioscarparo/helty-home-assistant` and select the **Dashboard** category.
@@ -399,6 +403,7 @@ docs/
   troubleshooting.md       Diagnostic guide and common fixes
 images/                    Diagrams and screenshots
 .github/ISSUE_TEMPLATE/    Issue forms for bug reports and translations
+.github/workflows/         HACS validation on every push and once a day
 ```
 
 ## Contributing
