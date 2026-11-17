@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://esphome.io/"><img alt="ESPHome 2026.9+" src="https://img.shields.io/badge/ESPHome-2026.9%2B-000?logo=esphome&logoColor=fff"></a>
   <a href="https://www.home-assistant.io/"><img alt="Home Assistant" src="https://img.shields.io/badge/Home_Assistant-18BCF2?logo=homeassistant&logoColor=fff"></a>
-  <a href="#dashboard-card"><img alt="HACS Custom" src="https://img.shields.io/badge/HACS-Custom-41BDF5?logo=homeassistantcommunitystore&logoColor=fff"></a>
+  <a href="#install-via-hacs"><img alt="HACS Default" src="https://img.shields.io/badge/HACS-Default-41BDF5?logo=homeassistantcommunitystore&logoColor=fff"></a>
   <a href="https://github.com/fabioscarparo/helty-home-assistant/blob/main/LICENSE"><img alt="MIT" src="https://img.shields.io/badge/License-MIT-333"></a>
 </p>
 
@@ -267,16 +267,15 @@ The card also displays clear banners if Modbus communication is lost, or if a fr
 
 ### Install via HACS
 
-Because the card is not in the default HACS store yet, add this repository as a custom repository. The button below opens it in HACS on your Home Assistant:
+The card is in the default HACS store. The button below opens it in HACS on your Home Assistant:
 
 [![Open the repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=fabioscarparo&repository=helty-home-assistant&category=plugin)
 
-Or add it by hand:
+Or find it by hand:
 
-1. Open **HACS**, then click **⋮ → Custom repositories**.
-2. Paste `https://github.com/fabioscarparo/helty-home-assistant` and select the **Dashboard** category.
-3. Find **Helty Flow40 Card**, open it, and click **Download**. HACS automatically registers the dashboard resource and notifies you of future updates.
-4. Refresh your browser.
+1. Open **HACS** and search for **Helty Flow40 Card**.
+2. Open it and click **Download**. HACS automatically registers the dashboard resource and notifies you of future updates.
+3. Refresh your browser.
 
 ### Manual installation
 
