@@ -29,7 +29,7 @@ the two PCBs.
 | HR 0-15 | Password and non-volatile data | **Never write** | - | - | Never read or written |
 | HR 1000 | Machine state | `0` off, `1`-`4` speed, `5` Hyper, `6` Night, `7` Free cooling | yes | yes | Ventilation fan & preset switches (read/write) |
 | HR 1051 | Manual free cooling timer | `0-9999 min` (default `20`) | yes* | yes | Manual free cooling timer (read-only diagnostic) |
-| HR 1060 | `ConfigStatus` bitmask | `0x01` Auto FC, `0x02` Exclude sensors, `0x04` Panel LED off | yes | no | Auto free cooling & Panel LED switches (read/write, default) |
+| HR 1060 | `ConfigStatus` bitmask | `0x01` Auto FC, `0x02` Exclude sensors, `0x04` Panel LED off* | yes | no | Auto free cooling & Panel LED switches (read/write, default) |
 | HR 1063 | Power LED intensity | `0-100 %` (Elite models only) | yes | no | Not exposed |
 | HR 1064 | Light timer | `0-999 s`, `0` = infinite (Elite models only) | yes | no | Not exposed |
 | HR 1070 | Heater ON temperature | Signed `×0.1 °C` (`-200..100`) | yes | yes | Heater ON temperature (read-only diagnostic) |
@@ -40,7 +40,7 @@ the two PCBs.
 | HR 1101 | Free cooling mode | `0` manual, `1` auto | no | yes | Auto free cooling switch (`pcb-blue.yaml`, read/write) |
 | HR 1117 | Modbus slave ID | `1-254` (default `2`) | no | yes | Modbus address (`pcb-blue.yaml`, read-only diagnostic) |
 
-*\*Helty's documentation marks `HR 1051` as Blue PCB only, but it also responds (`20` min) on tested Green PCB units.*
+*\*Helty's documentation marks `HR 1051` as Blue PCB only, but it also responds (`20` min) on tested Green PCB units. On Flow40 units with the FlowEASY wall panel, firmware `117` stores `HR 1060` bit `0x04` (Panel LED off) without turning off the panel LEDs, so **Panel LED** is disabled by default on Flow40 and enabled automatically by `flow120.yaml`.*
 
 The default ESPHome configuration (`helty-flow40.yaml`, Green PCB) writes only:
 
@@ -89,7 +89,9 @@ All 16 bits of `IR 1006` are defined:
 | `0x1000` | Humidity sensor not fitted | Info | Normal on base Flow40 (gates `IR 1004` in `air-quality.yaml`) |
 | `0x2000` | Free-cooling active | Status | Free cooling active |
 | `0x4000` | CO2/VOC sensor not fitted | Info | Normal on base Flow40 (gates `IR 1005`/`1015` in `air-quality.yaml`) |
-| `0x8000` | Automatic free-cooling (Blue PCB) | Status | Reflected by Auto free cooling switch (`HR 1101`) |
+| `0x8000` | Automatic free-cooling enabled | Status | Reflected by Auto free cooling switch (`HR 1060` bit `0x01` / `HR 1101`); verified active on Green PCB fw `117` as well as documented for Blue PCB |
 
-On a base Flow40 with no faults and free cooling/heating idle, `IR 1006` reads
-**`0x5000` (`20480`)**: the **Alarm code** entity shows the raw value.
+On a base Flow40 with no faults, free cooling/heating idle, and automatic free
+cooling off, `IR 1006` reads **`0x5000` (`20480`)** — or **`0xD000` (`53248`)**
+when automatic free cooling is enabled. The **Alarm code** entity shows the raw
+value.

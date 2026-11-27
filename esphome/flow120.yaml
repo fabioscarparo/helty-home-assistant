@@ -33,6 +33,9 @@ substitutions:
   airflow_speed_4: "80"
   airflow_hyper: "120"
 
+  # Flow120 / 120H / C120 officially support Panel LED On/Off
+  panel_led_disabled: "false"
+
 sensor:
   - id: !extend power_estimate
     accuracy_decimals: 1

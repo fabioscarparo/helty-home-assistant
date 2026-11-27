@@ -46,7 +46,7 @@ It is designed to be simple and inexpensive to build:
 |---|---|---|
 | Ventilation | Fan | On/off, 4 fan speeds, plus *Hyper*, *Night*, and *Free cooling* presets |
 | Hyper, Night, Free cooling | Switches | Activate a preset. Presets are mutually exclusive; turning one off restores the previous fan speed |
-| Panel LED, Auto free cooling | Config switches | Toggle the wall panel LEDs and automatic free cooling (`HR 1060` on Green PCB, `HR 1096`/`1101` with `pcb-blue.yaml`) |
+| Auto free cooling, Panel LED | Config switches | Toggle automatic free cooling (`HR 1060` on Green PCB, `HR 1101` with `pcb-blue.yaml`) and the wall panel LEDs (`HR 1060` / `HR 1096`; disabled by default on Flow40 because the FlowEASY panel ignores it, enabled automatically by `flow120.yaml`) |
 | Indoor and outdoor temperature | Sensors | In °C, with 0.1 °C resolution |
 | Filter air, Total air | Sensors | Partial filter air volume (`IR 1010`) and lifetime total air volume (`IR 1020`), in m³ (0.1 m³ resolution), to track filter wear |
 | Estimated power | Sensor | In W, from the Helty datasheet for the running mode — Flow40: night 2 W, speeds 1-4: 4, 6, 9, 18 W, hyper 20 W (use `flow120.yaml` for Flow120: 3, 6, 9, 13, 16.3, 39 W). The unit has no power meter. Not shown on the card |
@@ -167,7 +167,7 @@ The default configuration targets a base **Flow40 with Green PCB** (*Elettronica
       # - esphome/locales/it.yaml
 ```
 
-- **`flow120.yaml`** updates **Estimated power** (`3 / 6 / 9 / 13 / 16.3 / 39 W`, with 1 decimal) and **Estimated airflow** (`13 / 30 / 45 / 60 / 80 / 120 m³/h`) to the official Flow120/120H/C120 datasheet values.
+- **`flow120.yaml`** updates **Estimated power** (`3 / 6 / 9 / 13 / 16.3 / 39 W`, with 1 decimal) and **Estimated airflow** (`13 / 30 / 45 / 60 / 80 / 120 m³/h`) to the official Flow120/120H/C120 datasheet values, and enables the **Panel LED** switch by default.
 - **`pcb-blue.yaml`** removes Green PCB's `HR 1060` register so the bus stays free of Modbus exceptions, maps **Panel LED** (`HR 1096`) and **Auto free cooling** (`HR 1101`) to the Blue PCB registers, and adds a **Reset filter** button (`HR 1100`). *(Implemented from Helty's Modbus register map and HeltyShell; community feedback from physical Blue PCB units is welcome.)*
 - **`air-quality.yaml`** works on both Green and Blue PCBs. It inspects the missing-sensor bits of `IR 1006` (`0x1000` and `0x4000`), so if your unit only has humidity (no CO₂/VOC), the missing sensors report `unknown` instead of dummy values. When humidity is present, the [dashboard card](#dashboard-card) displays it next to the indoor temperature automatically.
 - If you aren't sure whether your unit has a Green or Blue PCB, check it with `./helty info` in [HeltyShell](https://github.com/fabioscarparo/HeltyShell).

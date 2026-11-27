@@ -30,6 +30,7 @@ switch:
     name: "${name_auto_free_cooling}"
     icon: mdi:snowflake-check
     entity_category: config
+    restore_mode: DISABLED
     lambda: |-
       if (id(blue_auto_fc) < 0) return {};
       return id(blue_auto_fc) == 1;
@@ -37,20 +38,20 @@ switch:
       - lambda: |-
           if (id(blue_auto_fc) < 0 || id(blue_auto_fc) == 1) return;
           id(blue_auto_fc) = 1;
-          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1101, 1);
-          id(helty)->queue_command(cmd);
+          id(blue_auto_fc_raw).make_call().set_value(1).perform();
     turn_off_action:
       - lambda: |-
           if (id(blue_auto_fc) < 0 || id(blue_auto_fc) == 0) return;
           id(blue_auto_fc) = 0;
-          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1101, 0);
-          id(helty)->queue_command(cmd);
+          id(blue_auto_fc_raw).make_call().set_value(0).perform();
 
   - platform: template
     id: sw_blue_panel_led
     name: "${name_panel_led}"
     icon: mdi:led-on
     entity_category: config
+    disabled_by_default: ${panel_led_disabled}
+    restore_mode: DISABLED
     lambda: |-
       if (id(blue_led_off) < 0) return {};
       // HR 1096: 0 = LED on, 1 = LED off
@@ -59,28 +60,14 @@ switch:
       - lambda: |-
           if (id(blue_led_off) < 0 || id(blue_led_off) == 0) return;
           id(blue_led_off) = 0;
-          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1096, 0);
-          id(helty)->queue_command(cmd);
+          id(blue_led_off_raw).make_call().set_value(0).perform();
     turn_off_action:
       - lambda: |-
           if (id(blue_led_off) < 0 || id(blue_led_off) == 1) return;
           id(blue_led_off) = 1;
-          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1096, 1);
-          id(helty)->queue_command(cmd);
+          id(blue_led_off_raw).make_call().set_value(1).perform();
 
-button:
-  - platform: template
-    id: btn_reset_filter
-    name: "${name_reset_filter}"
-    icon: mdi:air-filter
-    entity_category: config
-    on_press:
-      - lambda: |-
-          if (!id(ever_ok)) return;
-          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1100, 0x4550);
-          id(helty)->queue_command(cmd);
-
-sensor:
+number:
   - id: !remove cfg_status_raw
 
   - platform: modbus_controller
@@ -91,6 +78,9 @@ sensor:
     register_type: holding
     address: 1101
     value_type: U_WORD
+    min_value: 0
+    max_value: 1
+    step: 1
     on_value:
       then:
         - lambda: |-
@@ -104,11 +94,32 @@ sensor:
     register_type: holding
     address: 1096
     value_type: U_WORD
+    min_value: 0
+    max_value: 1
+    step: 1
     on_value:
       then:
         - lambda: |-
             if (!std::isnan(x)) id(blue_led_off) = (int) x;
 
+button:
+  - platform: template
+    id: btn_reset_filter
+    name: "${name_reset_filter}"
+    icon: mdi:air-filter
+    entity_category: config
+    on_press:
+      - if:
+          condition:
+            lambda: 'return id(ever_ok);'
+          then:
+            - modbus_client.write_single_register:
+                modbus_id: modbus_helty
+                address: ${modbus_address}
+                start_address: 1100
+                value: 0x4550
+
+sensor:
   - platform: modbus_controller
     modbus_controller_id: helty
     id: blue_modbus_id

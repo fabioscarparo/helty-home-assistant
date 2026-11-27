@@ -114,6 +114,10 @@ substitutions:
   airflow_speed_4: "37"
   airflow_hyper: "42"
 
+  # Panel LED switch: Flow40's FlowEASY wall panel ignores the LedOff bit even
+  # though firmware 117 stores it in HR 1060. flow120.yaml sets this to "false".
+  panel_led_disabled: "true"
+
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -350,14 +354,15 @@ switch:
           if (sp < 1 || sp > 4) sp = 1;
           if (id(vmc_status) == 7) id(vmc_mode).make_call().set_index(sp).perform();
 
-  # Configuration switches on Green PCB (HR 1060 bitmask, read-modify-write).
-  # Replaced by pcb-blue.yaml on Blue PCB units. Nothing is written until HR 1060
-  # has been read at least once.
+  # Configuration switches on Green PCB (HR 1060 bitmask, read-modify-write via
+  # the internal cfg_status_raw number). Replaced by pcb-blue.yaml on Blue PCB
+  # units. Nothing is written until HR 1060 has been read at least once.
   - platform: template
     id: sw_auto_fc
     name: "${name_auto_free_cooling}"
     icon: mdi:snowflake-check
     entity_category: config
+    restore_mode: DISABLED
     lambda: |-
       if (id(vmc_config) < 0) return {};
       return (id(vmc_config) & 0x0001) != 0;
@@ -368,8 +373,7 @@ switch:
           uint16_t next = static_cast<uint16_t>(cur | 0x0001);
           if (next == cur) return;
           id(vmc_config) = next;
-          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1060, next);
-          id(helty)->queue_command(cmd);
+          id(cfg_status_raw).make_call().set_value(next).perform();
     turn_off_action:
       - lambda: |-
           if (id(vmc_config) < 0) return;
@@ -377,14 +381,15 @@ switch:
           uint16_t next = static_cast<uint16_t>(cur & ~0x0001);
           if (next == cur) return;
           id(vmc_config) = next;
-          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1060, next);
-          id(helty)->queue_command(cmd);
+          id(cfg_status_raw).make_call().set_value(next).perform();
 
   - platform: template
     id: sw_panel_led
     name: "${name_panel_led}"
     icon: mdi:led-on
     entity_category: config
+    disabled_by_default: ${panel_led_disabled}
+    restore_mode: DISABLED
     lambda: |-
       if (id(vmc_config) < 0) return {};
       // Bit 0x0004 is LedOff: 0 = LED on, 1 = LED off
@@ -396,8 +401,7 @@ switch:
           uint16_t next = static_cast<uint16_t>(cur & ~0x0004);
           if (next == cur) return;
           id(vmc_config) = next;
-          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1060, next);
-          id(helty)->queue_command(cmd);
+          id(cfg_status_raw).make_call().set_value(next).perform();
     turn_off_action:
       - lambda: |-
           if (id(vmc_config) < 0) return;
@@ -405,8 +409,26 @@ switch:
           uint16_t next = static_cast<uint16_t>(cur | 0x0004);
           if (next == cur) return;
           id(vmc_config) = next;
-          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1060, next);
-          id(helty)->queue_command(cmd);
+          id(cfg_status_raw).make_call().set_value(next).perform();
+
+# -- Green PCB ConfigStatus register (internal: reads & writes HR 1060) -------
+# Removed by pcb-blue.yaml on Blue PCB units.
+number:
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: cfg_status_raw
+    name: "Config status"
+    internal: true
+    register_type: holding
+    address: 1060
+    value_type: U_WORD
+    min_value: 0
+    max_value: 65535
+    step: 1
+    on_value:
+      then:
+        - lambda: |-
+            if (!std::isnan(x)) id(vmc_config) = (int) x;
 
 # -- Sensors -------------------------------------------------------------------
 sensor:
@@ -555,20 +577,6 @@ sensor:
     entity_category: diagnostic
     filters:
       - multiply: 0.1
-
-  # Internal: Green PCB ConfigStatus bitmask (HR 1060). Removed by pcb-blue.yaml.
-  - platform: modbus_controller
-    modbus_controller_id: helty
-    id: cfg_status_raw
-    name: "Config status"
-    internal: true
-    register_type: holding
-    address: 1060
-    value_type: U_WORD
-    on_value:
-      then:
-        - lambda: |-
-            if (!std::isnan(x)) id(vmc_config) = (int) x;
 
   # Estimated from the mode, since the unit has no power meter. Unknown while
   # the unit doesn't answer. For kWh, add an Integral helper in Home Assistant.
