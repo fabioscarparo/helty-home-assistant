@@ -1,0 +1,132 @@
+# -----------------------------------------------------------------------------
+# Helty Flow - Optional Blue PCB (Elettronica Blu) package
+# https://github.com/fabioscarparo/helty-home-assistant
+#
+# Include after esphome/helty-flow40.yaml in device.yaml on Blue PCB units.
+#
+# Removes Green PCB's HR 1060 register and replaces the Panel LED and Auto free
+# cooling switches with their Blue PCB registers (HR 1096 and HR 1101). Also
+# adds the partial filter counter reset button (HR 1100 = 0x4550) and read-only
+# diagnostics for sensor exclusion (HR 1085) and Modbus slave ID (HR 1117).
+#
+# Implemented from Helty's official Modbus register map and HeltyShell; nothing
+# is written at boot.
+# -----------------------------------------------------------------------------
+
+globals:
+  - id: blue_auto_fc        # last value of HR 1101 (0=manual, 1=auto); -1 = not read yet
+    type: int
+    initial_value: '-1'
+  - id: blue_led_off        # last value of HR 1096 (0=on, 1=off); -1 = not read yet
+    type: int
+    initial_value: '-1'
+
+switch:
+  - id: !remove sw_auto_fc
+  - id: !remove sw_panel_led
+
+  - platform: template
+    id: sw_blue_auto_fc
+    name: "${name_auto_free_cooling}"
+    icon: mdi:snowflake-check
+    entity_category: config
+    lambda: |-
+      if (id(blue_auto_fc) < 0) return {};
+      return id(blue_auto_fc) == 1;
+    turn_on_action:
+      - lambda: |-
+          if (id(blue_auto_fc) < 0 || id(blue_auto_fc) == 1) return;
+          id(blue_auto_fc) = 1;
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1101, 1);
+          id(helty)->queue_command(cmd);
+    turn_off_action:
+      - lambda: |-
+          if (id(blue_auto_fc) < 0 || id(blue_auto_fc) == 0) return;
+          id(blue_auto_fc) = 0;
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1101, 0);
+          id(helty)->queue_command(cmd);
+
+  - platform: template
+    id: sw_blue_panel_led
+    name: "${name_panel_led}"
+    icon: mdi:led-on
+    entity_category: config
+    lambda: |-
+      if (id(blue_led_off) < 0) return {};
+      // HR 1096: 0 = LED on, 1 = LED off
+      return id(blue_led_off) == 0;
+    turn_on_action:
+      - lambda: |-
+          if (id(blue_led_off) < 0 || id(blue_led_off) == 0) return;
+          id(blue_led_off) = 0;
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1096, 0);
+          id(helty)->queue_command(cmd);
+    turn_off_action:
+      - lambda: |-
+          if (id(blue_led_off) < 0 || id(blue_led_off) == 1) return;
+          id(blue_led_off) = 1;
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1096, 1);
+          id(helty)->queue_command(cmd);
+
+button:
+  - platform: template
+    id: btn_reset_filter
+    name: "${name_reset_filter}"
+    icon: mdi:air-filter
+    entity_category: config
+    on_press:
+      - lambda: |-
+          if (!id(ever_ok)) return;
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1100, 0x4550);
+          id(helty)->queue_command(cmd);
+
+sensor:
+  - id: !remove cfg_status_raw
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: blue_auto_fc_raw
+    name: "Blue PCB auto free cooling"
+    internal: true
+    register_type: holding
+    address: 1101
+    value_type: U_WORD
+    on_value:
+      then:
+        - lambda: |-
+            if (!std::isnan(x)) id(blue_auto_fc) = (int) x;
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: blue_led_off_raw
+    name: "Blue PCB panel LED off"
+    internal: true
+    register_type: holding
+    address: 1096
+    value_type: U_WORD
+    on_value:
+      then:
+        - lambda: |-
+            if (!std::isnan(x)) id(blue_led_off) = (int) x;
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: blue_modbus_id
+    name: "${name_modbus_id}"
+    register_type: holding
+    address: 1117
+    value_type: U_WORD
+    accuracy_decimals: 0
+    icon: mdi:identifier
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: blue_sensors_excluded
+    name: "${name_sensors_excluded}"
+    register_type: holding
+    address: 1085
+    bitmask: 0x0001
+    icon: mdi:eye-off-outline
+    entity_category: diagnostic

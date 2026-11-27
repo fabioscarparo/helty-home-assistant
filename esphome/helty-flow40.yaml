@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Helty Flow40 - M5Stack ATOM Lite + Atomic RS485 Base
+# Helty Flow (Flow40 / Flow120) - M5Stack ATOM Lite + Atomic RS485 Base
 # https://github.com/fabioscarparo/helty-home-assistant
 #
 # Usually loaded as a package by device.yaml. It also works on its own: paste
@@ -9,18 +9,32 @@
 #   Ventilation    fan: on/off, 4 speeds, Hyper/Night/Free cooling presets
 #   Hyper, Night, Free cooling   switches, mutually exclusive. Turning a
 #                  preset off goes back to the last speed used.
-#   Temperatures, alarms, Modbus communication, diagnostics
+#   Panel LED, Auto free cooling   configuration switches (HR 1060 on Green PCB)
+#   Temperatures, filter/total air counters, active free cooling/heating,
+#                  alarms, Modbus communication, diagnostics
 #   Estimated power   W from the Flow40 datasheet, by operating mode: the unit
-#                  has no power meter
+#                  has no power meter (override with flow120.yaml for Flow120)
+#   Estimated airflow m³/h from the Flow40 datasheet, by operating mode
+#                  (override with flow120.yaml for Flow120)
 #
-# Registers checked on a Flow40 (firmware 117, PID 0x1102):
-#   IR 1000  indoor temperature     x0.1 °C
-#   IR 1001  outdoor temperature    x0.1 °C
-#   IR 1006  alarm bitmask          (0x5000 = no CO2 and humidity sensors)
+# Registers checked on a Flow40 / Flow120 (Green PCB, firmware 117, PID 0x1102):
+#   IR 1000  indoor temperature        x0.1 °C (signed)
+#   IR 1001  outdoor temperature       x0.1 °C (signed)
+#   IR 1006  alarm & status bitmask    (0x5000 = no CO2 and humidity sensors)
+#   IR 1010  partial filter air        x0.1 m³
 #   IR 1012  firmware version
-#   HR 1000  machine state          0=off 1-4=speed 5=hyper 6=night 7=free cooling
-# The only possible write is HR 1000 with a value from 0 to 7, always through
-# the internal "Machine state" select. Nothing is written at boot.
+#   IR 1020  total air volume          x0.1 m³
+#   HR 1000  machine state             0=off 1-4=speed 5=hyper 6=night 7=free cooling
+#   HR 1051  manual free cooling timer min (read-only diagnostic)
+#   HR 1060  ConfigStatus bitmask      0x01=AutoFC 0x02=NoSensors 0x04=LedOff
+#   HR 1070  heater ON temperature     x0.1 °C (signed, read-only diagnostic)
+#   HR 1072  heater OFF temperature    x0.1 °C (signed, read-only diagnostic)
+#
+# Writes are limited to HR 1000 (0-7, via the internal "Machine state" select)
+# and HR 1060 (read-modify-write bitmask for Panel LED and Auto free cooling).
+# Nothing is written at boot. Optional packages in esphome/ add Flow120
+# datasheet presets (flow120.yaml), Blue PCB support (pcb-blue.yaml), and
+# humidity/CO2/VOC sensors (air-quality.yaml).
 #
 # The dashboard card (helty-flow40-card.js) recognizes the entities by their
 # icons, in any language: keep the icons of switches, temperatures and alarms.
@@ -39,26 +53,49 @@ substitutions:
   name_hyper: Hyper
   name_night: Night
   name_free_cooling: Free cooling
+  name_panel_led: Panel LED
+  name_auto_free_cooling: Auto free cooling
   name_indoor_temperature: Indoor temperature
   name_outdoor_temperature: Outdoor temperature
+  name_filter_air: Filter air
+  name_total_air: Total air
+  name_fc_timer: Manual free cooling timer
+  name_heater_on_temp: Heater ON temperature
+  name_heater_off_temp: Heater OFF temperature
   name_alarm_code: Alarm code
   name_firmware: Firmware version
-  name_register_1010: Register 1010
   name_register_1014: Register 1014
   name_wifi_signal: WiFi signal
   name_modbus: Modbus communication
+  name_free_cooling_active: Free cooling active
+  name_free_heating_active: Free heating active
   name_filter_alarm: Filter alarm
   name_frost_alarm: Frost alarm
+  name_temp_delta_alarm: Temperature difference alarm
   name_indoor_fan_fault: Indoor fan fault
   name_outdoor_fan_fault: Outdoor fan fault
   name_indoor_probe_fault: Indoor sensor fault
   name_outdoor_probe_fault: Outdoor sensor fault
   name_eeprom_error: EEPROM error
   name_power: Estimated power
+  name_airflow: Estimated airflow
+
+  # Entity names used by optional packages (air-quality.yaml, pcb-blue.yaml).
+  # Kept here so a locale file overrides them regardless of package order.
+  name_indoor_humidity: Indoor humidity
+  name_co2: CO2
+  name_voc: VOC
+  name_high_humidity_alarm: High humidity alarm
+  name_humidity_alarm: Humidity alarm
+  name_co2_alarm: CO2/VOC alarm
+  name_reset_filter: Reset filter
+  name_sensors_excluded: Sensors excluded
+  name_modbus_id: Modbus address
 
   # Power drawn by the Flow40 in each mode, in W, from the Helty datasheet
-  # (Flow30-40 MY25). Free cooling is a bypass at the speed in use, so it
-  # draws the power of that speed. Standby is not in the datasheet.
+  # (Flow30-40). Free cooling is a bypass at the speed in use, so it draws
+  # the power of that speed. Standby is not in the datasheet.
+  # Include esphome/flow120.yaml for Flow120 / Flow120H / FlowC120 values.
   power_off: "0"
   power_night: "2"
   power_speed_1: "4"
@@ -66,6 +103,16 @@ substitutions:
   power_speed_3: "9"
   power_speed_4: "18"
   power_hyper: "20"
+
+  # Balanced airflow of the Flow40 in each mode, in m³/h, from the Helty
+  # datasheet (Flow30-40). Include esphome/flow120.yaml for Flow120 values.
+  airflow_off: "0"
+  airflow_night: "8"
+  airflow_speed_1: "10"
+  airflow_speed_2: "17"
+  airflow_speed_3: "26"
+  airflow_speed_4: "37"
+  airflow_hyper: "42"
 
 esphome:
   name: ${device_name}
@@ -75,7 +122,7 @@ esphome:
   # The dashboard card finds the unit by this model.
   project:
     name: fabioscarparo.helty-flow40
-    version: "1.1.2"
+    version: "1.2.0"
 
 esp32:
   board: m5stack-atom
@@ -127,6 +174,12 @@ modbus_controller:
 
 globals:
   - id: vmc_status          # last value of HR 1000; -1 = not read yet
+    type: int
+    initial_value: '-1'
+  - id: vmc_config          # last value of HR 1060 (Green PCB ConfigStatus); -1 = not read yet
+    type: int
+    initial_value: '-1'
+  - id: vmc_alarms          # last value of IR 1006; -1 = not read yet
     type: int
     initial_value: '-1'
   - id: last_speed          # last speed 1-4, to go back to when a preset ends
@@ -211,7 +264,8 @@ select:
               call.perform();
             }
             id(syncing) = false;
-            id(power_estimate).update();  // the new mode, the new power
+            id(power_estimate).update();    // the new mode, the new power
+            id(airflow_estimate).update();  // and the new airflow
 
 # -- Fan: on/off, speed and presets -------------------------------------------
 fan:
@@ -296,6 +350,64 @@ switch:
           if (sp < 1 || sp > 4) sp = 1;
           if (id(vmc_status) == 7) id(vmc_mode).make_call().set_index(sp).perform();
 
+  # Configuration switches on Green PCB (HR 1060 bitmask, read-modify-write).
+  # Replaced by pcb-blue.yaml on Blue PCB units. Nothing is written until HR 1060
+  # has been read at least once.
+  - platform: template
+    id: sw_auto_fc
+    name: "${name_auto_free_cooling}"
+    icon: mdi:snowflake-check
+    entity_category: config
+    lambda: |-
+      if (id(vmc_config) < 0) return {};
+      return (id(vmc_config) & 0x0001) != 0;
+    turn_on_action:
+      - lambda: |-
+          if (id(vmc_config) < 0) return;
+          uint16_t cur = static_cast<uint16_t>(id(vmc_config));
+          uint16_t next = static_cast<uint16_t>(cur | 0x0001);
+          if (next == cur) return;
+          id(vmc_config) = next;
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1060, next);
+          id(helty)->queue_command(cmd);
+    turn_off_action:
+      - lambda: |-
+          if (id(vmc_config) < 0) return;
+          uint16_t cur = static_cast<uint16_t>(id(vmc_config));
+          uint16_t next = static_cast<uint16_t>(cur & ~0x0001);
+          if (next == cur) return;
+          id(vmc_config) = next;
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1060, next);
+          id(helty)->queue_command(cmd);
+
+  - platform: template
+    id: sw_panel_led
+    name: "${name_panel_led}"
+    icon: mdi:led-on
+    entity_category: config
+    lambda: |-
+      if (id(vmc_config) < 0) return {};
+      // Bit 0x0004 is LedOff: 0 = LED on, 1 = LED off
+      return (id(vmc_config) & 0x0004) == 0;
+    turn_on_action:
+      - lambda: |-
+          if (id(vmc_config) < 0) return;
+          uint16_t cur = static_cast<uint16_t>(id(vmc_config));
+          uint16_t next = static_cast<uint16_t>(cur & ~0x0004);
+          if (next == cur) return;
+          id(vmc_config) = next;
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1060, next);
+          id(helty)->queue_command(cmd);
+    turn_off_action:
+      - lambda: |-
+          if (id(vmc_config) < 0) return;
+          uint16_t cur = static_cast<uint16_t>(id(vmc_config));
+          uint16_t next = static_cast<uint16_t>(cur | 0x0004);
+          if (next == cur) return;
+          id(vmc_config) = next;
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(id(helty), 1060, next);
+          id(helty)->queue_command(cmd);
+
 # -- Sensors -------------------------------------------------------------------
 sensor:
   - platform: modbus_controller
@@ -336,6 +448,7 @@ sensor:
 
   - platform: modbus_controller
     modbus_controller_id: helty
+    id: alarm_code
     name: "${name_alarm_code}"
     register_type: read
     address: 1006
@@ -343,6 +456,40 @@ sensor:
     accuracy_decimals: 0
     icon: mdi:alert-circle-outline
     entity_category: diagnostic
+    on_value:
+      then:
+        - lambda: |-
+            if (!std::isnan(x)) id(vmc_alarms) = (int) x;
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: filter_air
+    name: "${name_filter_air}"
+    register_type: read
+    address: 1010
+    value_type: U_WORD
+    unit_of_measurement: "m³"
+    device_class: volume
+    state_class: total_increasing
+    accuracy_decimals: 1
+    icon: mdi:air-filter
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: total_air
+    name: "${name_total_air}"
+    register_type: read
+    address: 1020
+    value_type: U_WORD
+    unit_of_measurement: "m³"
+    device_class: volume
+    state_class: total_increasing
+    accuracy_decimals: 1
+    icon: mdi:counter
+    filters:
+      - multiply: 0.1
 
   - platform: modbus_controller
     modbus_controller_id: helty
@@ -354,17 +501,7 @@ sensor:
     icon: mdi:chip
     entity_category: diagnostic
 
-  # Undocumented registers, exposed to work out what they mean (filter hours?)
-  - platform: modbus_controller
-    modbus_controller_id: helty
-    name: "${name_register_1010}"
-    register_type: read
-    address: 1010
-    value_type: U_WORD
-    accuracy_decimals: 0
-    entity_category: diagnostic
-    disabled_by_default: true
-
+  # Undocumented register, kept disabled for investigation
   - platform: modbus_controller
     modbus_controller_id: helty
     name: "${name_register_1014}"
@@ -374,6 +511,64 @@ sensor:
     accuracy_decimals: 0
     entity_category: diagnostic
     disabled_by_default: true
+
+  # Configuration holding registers (read-only diagnostics)
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: fc_timer
+    name: "${name_fc_timer}"
+    register_type: holding
+    address: 1051
+    value_type: U_WORD
+    unit_of_measurement: "min"
+    device_class: duration
+    accuracy_decimals: 0
+    icon: mdi:timer-outline
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: heater_on_temp
+    name: "${name_heater_on_temp}"
+    register_type: holding
+    address: 1070
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 1
+    icon: mdi:thermometer-chevron-down
+    entity_category: diagnostic
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: heater_off_temp
+    name: "${name_heater_off_temp}"
+    register_type: holding
+    address: 1072
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 1
+    icon: mdi:thermometer-chevron-up
+    entity_category: diagnostic
+    filters:
+      - multiply: 0.1
+
+  # Internal: Green PCB ConfigStatus bitmask (HR 1060). Removed by pcb-blue.yaml.
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: cfg_status_raw
+    name: "Config status"
+    internal: true
+    register_type: holding
+    address: 1060
+    value_type: U_WORD
+    on_value:
+      then:
+        - lambda: |-
+            if (!std::isnan(x)) id(vmc_config) = (int) x;
 
   # Estimated from the mode, since the unit has no power meter. Unknown while
   # the unit doesn't answer. For kWh, add an Integral helper in Home Assistant.
@@ -399,6 +594,31 @@ sensor:
         default: return NAN;
       }
 
+  # Estimated from the mode, from the Helty datasheet. Unknown while the unit
+  # doesn't answer.
+  - platform: template
+    id: airflow_estimate
+    name: "${name_airflow}"
+    device_class: volume_flow_rate
+    state_class: measurement
+    unit_of_measurement: "m³/h"
+    accuracy_decimals: 0
+    icon: mdi:weather-windy
+    update_interval: 10s
+    lambda: |-
+      if (!id(ever_ok) || millis() - id(last_ok_ms) >= 35000) return NAN;
+      const float speed[] = {${airflow_speed_1}, ${airflow_speed_2}, ${airflow_speed_3}, ${airflow_speed_4}};
+      int sp = id(last_speed);
+      if (sp < 1 || sp > 4) sp = 1;
+      switch (id(vmc_status)) {
+        case 0: return ${airflow_off};
+        case 1: case 2: case 3: case 4: return speed[id(vmc_status) - 1];
+        case 5: return ${airflow_hyper};
+        case 6: return ${airflow_night};
+        case 7: return speed[sp - 1];  // free cooling runs at the speed in use
+        default: return NAN;
+      }
+
   - platform: wifi_signal
     name: "${name_wifi_signal}"
     update_interval: 60s
@@ -414,6 +634,27 @@ binary_sensor:
     entity_category: diagnostic
     lambda: |-
       return id(ever_ok) && (millis() - id(last_ok_ms) < 35000);
+
+  # Operational status bits of IR 1006 (not alarms)
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: free_cooling_active
+    name: "${name_free_cooling_active}"
+    register_type: read
+    address: 1006
+    bitmask: 0x2000
+    device_class: running
+    icon: mdi:snowflake-thermometer
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: free_heating_active
+    name: "${name_free_heating_active}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0800
+    device_class: running
+    icon: mdi:sun-thermometer-outline
 
   - platform: modbus_controller
     modbus_controller_id: helty
@@ -432,6 +673,16 @@ binary_sensor:
     bitmask: 0x0020
     device_class: problem
     icon: mdi:snowflake-alert
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: temp_delta_alarm
+    name: "${name_temp_delta_alarm}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0100
+    device_class: problem
+    icon: mdi:thermometer-alert
 
   - platform: modbus_controller
     modbus_controller_id: helty

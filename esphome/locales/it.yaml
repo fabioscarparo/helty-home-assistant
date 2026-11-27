@@ -6,19 +6,40 @@ substitutions:
   name_hyper: Hyper
   name_night: Notte
   name_free_cooling: Free cooling
+  name_panel_led: LED pannello
+  name_auto_free_cooling: Free cooling automatico
   name_indoor_temperature: Temperatura ambiente
   name_outdoor_temperature: Temperatura esterna
+  name_filter_air: Aria filtro
+  name_total_air: Aria totale
+  name_fc_timer: Timer free cooling manuale
+  name_heater_on_temp: Soglia riscaldatore ON
+  name_heater_off_temp: Soglia riscaldatore OFF
   name_alarm_code: Codice allarmi
   name_firmware: Versione firmware
-  name_register_1010: Registro 1010
   name_register_1014: Registro 1014
   name_wifi_signal: Segnale WiFi
   name_modbus: Comunicazione Modbus
+  name_free_cooling_active: Free cooling attivo
+  name_free_heating_active: Free heating attivo
   name_filter_alarm: Allarme filtro
   name_frost_alarm: Allarme ghiaccio
+  name_temp_delta_alarm: Allarme differenza temperatura
   name_indoor_fan_fault: Guasto ventola interna
   name_outdoor_fan_fault: Guasto ventola esterna
   name_indoor_probe_fault: Guasto sonda interna
   name_outdoor_probe_fault: Guasto sonda esterna
   name_eeprom_error: Errore EEPROM
   name_power: Potenza stimata
+  name_airflow: Portata aria stimata
+
+  # Entità dei pacchetti opzionali (air-quality.yaml, pcb-blue.yaml)
+  name_indoor_humidity: Umidità ambiente
+  name_co2: CO2
+  name_voc: VOC
+  name_high_humidity_alarm: Allarme umidità alta
+  name_humidity_alarm: Allarme umidità
+  name_co2_alarm: Allarme CO2/VOC
+  name_reset_filter: Reset filtro
+  name_sensors_excluded: Sensori esclusi
+  name_modbus_id: Indirizzo Modbus

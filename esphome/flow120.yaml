@@ -1,0 +1,38 @@
+# -----------------------------------------------------------------------------
+# Helty Flow120 / Flow120H / FlowC120 - Optional model overrides package
+# https://github.com/fabioscarparo/helty-home-assistant
+#
+# Include after esphome/helty-flow40.yaml in device.yaml on Flow120, Flow120H
+# or FlowC120 units.
+#
+# Replaces the Flow40 datasheet power (W) and airflow (m³/h) values with the
+# official Flow120/120H/C120 datasheet specifications:
+#   Mode     Power (W)   Airflow (m³/h)
+#   Night        3             13
+#   Speed 1      6             30
+#   Speed 2      9             45
+#   Speed 3     13             60
+#   Speed 4     16.3           80
+#   Hyper       39            120
+# -----------------------------------------------------------------------------
+
+substitutions:
+  power_off: "0"
+  power_night: "3"
+  power_speed_1: "6"
+  power_speed_2: "9"
+  power_speed_3: "13"
+  power_speed_4: "16.3"
+  power_hyper: "39"
+
+  airflow_off: "0"
+  airflow_night: "13"
+  airflow_speed_1: "30"
+  airflow_speed_2: "45"
+  airflow_speed_3: "60"
+  airflow_speed_4: "80"
+  airflow_hyper: "120"
+
+sensor:
+  - id: !extend power_estimate
+    accuracy_decimals: 1

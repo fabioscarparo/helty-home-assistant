@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>Control a Helty Flow40 ventilation unit from Home Assistant<br>
+  <strong>Control a Helty Flow ventilation unit (Flow40, Flow120) from Home Assistant<br>
   using two snap-together modules and four wires.</strong>
 </p>
 
@@ -14,11 +14,11 @@
   <a href="https://github.com/fabioscarparo/helty-home-assistant/blob/main/LICENSE"><img alt="MIT" src="https://img.shields.io/badge/License-MIT-333"></a>
 </p>
 
-The **Helty Flow40** is a single-room heat recovery ventilation unit (known in
-Italy as a *VMC*). Units equipped with the Modbus terminal block can be monitored
-and controlled over RS-485: this project connects an **M5Stack ATOM Lite**
-running [ESPHome](https://esphome.io) to that bus and brings the unit into
-Home Assistant, with no cloud and no vendor app.
+**Helty Flow** units (**Flow40**, **Flow120**) are decentralized heat recovery
+ventilation units (known in Italy as *VMC*). Units equipped with the Modbus
+terminal block can be monitored and controlled over RS-485: this project
+connects an **M5Stack ATOM Lite** running [ESPHome](https://esphome.io) to that
+bus and brings the unit into Home Assistant, with no cloud and no vendor app.
 
 It is designed to be simple and inexpensive to build:
 
@@ -30,8 +30,7 @@ It is designed to be simple and inexpensive to build:
 - **No external power supply** - Powered directly by the unit's 24 V rail
   and compact enough to fit inside the casing.
 - **100% Local** - Everything stays on your local network.
-- **Safe by design** - The firmware only modifies the operating mode and
-  never writes to any register on boot.
+- **Safe by design** - Writes only to the operating mode (`HR 1000`) and explicit configuration toggles (`Panel LED`, `Auto free cooling`), using safe read-modify-write and never writing to any register on boot.
 - **Familiar UI** - Includes a custom [dashboard card](#dashboard-card) modeled
   after the unit's wall panel, designed to blend seamlessly with core Home Assistant cards.
 
@@ -47,25 +46,35 @@ It is designed to be simple and inexpensive to build:
 |---|---|---|
 | Ventilation | Fan | On/off, 4 fan speeds, plus *Hyper*, *Night*, and *Free cooling* presets |
 | Hyper, Night, Free cooling | Switches | Activate a preset. Presets are mutually exclusive; turning one off restores the previous fan speed |
+| Panel LED, Auto free cooling | Config switches | Toggle the wall panel LEDs and automatic free cooling (`HR 1060` on Green PCB, `HR 1096`/`1101` with `pcb-blue.yaml`) |
 | Indoor and outdoor temperature | Sensors | In °C, with 0.1 °C resolution |
-| Estimated power | Sensor | In W, from the Flow40 datasheet for the running mode: night 2 W, speed 1-4 4, 6, 9 and 18 W, hyper 20 W. The unit has no power meter. Not shown on the card |
-| Filter alarm, frost alarm, indoor/outdoor fan fault | Binary sensors | Read directly from the unit's alarm register |
+| Filter air, Total air | Sensors | Partial filter air volume (`IR 1010`) and lifetime total air volume (`IR 1020`), in m³ (0.1 m³ resolution), to track filter wear |
+| Estimated power | Sensor | In W, from the Helty datasheet for the running mode — Flow40: night 2 W, speeds 1-4: 4, 6, 9, 18 W, hyper 20 W (use `flow120.yaml` for Flow120: 3, 6, 9, 13, 16.3, 39 W). The unit has no power meter. Not shown on the card |
+| Estimated airflow | Sensor | In m³/h, from the Helty datasheet for the running mode — Flow40: night 8, speeds 1-4: 10, 17, 26, 37, hyper 42 m³/h (Flow120 with `flow120.yaml`: 13, 30, 45, 60, 80, 120 m³/h). Not shown on the card |
+| Free cooling active, Free heating active | Binary sensors | Report when free cooling or free heating bypass is actually running (`IR 1006`) |
+| Filter alarm, frost alarm, temperature difference alarm, indoor/outdoor fan fault | Binary sensors | Read directly from the unit's alarm register |
 | Modbus communication | Diagnostic | Reports *Connected* if the unit has responded within the last 35 seconds |
-| Alarm code, firmware version, Wi-Fi signal, sensor faults, EEPROM error | Diagnostic | For system status and troubleshooting |
+| Manual free cooling timer, heater ON/OFF temperatures, alarm code, firmware version, Wi-Fi signal, sensor faults, EEPROM error | Diagnostic | Configuration values and system status for troubleshooting |
+
+Optional packages in `esphome/` extend this to other Helty Flow setups (see [Optional packages](#optional-packages)):
+
+- **`flow120.yaml`**: for **Flow120 / Flow120H / FlowC120** units — switches **Estimated power** (`3–39 W`) and **Estimated airflow** (`13–120 m³/h`) to the official Flow120 datasheet values.
+- **`pcb-blue.yaml`**: for Blue PCB (*Elettronica Blu*) units — remaps Panel LED and Auto free cooling to their Blue PCB registers and adds a **Reset filter** button (`HR 1100`), **Sensors excluded**, and **Modbus address** diagnostics.
+- **`air-quality.yaml`**: for units with humidity, CO₂, and/or VOC sensors (e.g. Flow40 Plus/Elite, Flow120) — adds **Indoor humidity**, **CO2**, **VOC**, and humidity/CO₂ alarms, automatically masking any unfitted sensor as `unknown`.
 
 State updates every 10 seconds, including when changes are made directly
 from the unit's physical controls or remote.
 
 ```mermaid
 flowchart LR
-  VMC["Helty Flow40<br/>Modbus terminal block"] -- "RS-485 (A/B)<br/>and 24 Vdc" --> BASE["Atomic RS485 Base"]
+  VMC["Helty Flow<br/>Modbus terminal block"] -- "RS-485 (A/B)<br/>and 24 Vdc" --> BASE["Atomic RS485 Base"]
   BASE --- ATOM["ATOM Lite<br/>ESPHome"]
   ATOM -- "Wi-Fi<br/>encrypted API" --> HA["Home Assistant"]
 ```
 
 ## Requirements
 
-- A **Helty Flow40 with the Modbus terminal block**: the green 7-pin
+- A **Helty Flow40** or **Helty Flow120** with the Modbus terminal block: the green 7-pin
   terminal block (`1`-`6` and `X`) next to the RJ socket, providing 24 Vdc on
   terminals `1`-`2` and Modbus on terminals `4`-`5`.
 - **Home Assistant** with the **ESPHome Device Builder** add-on,
@@ -75,7 +84,8 @@ flowchart LR
 - A small flathead screwdriver. A multimeter is recommended to verify the 24 V polarity before connecting.
 
 > [!IMPORTANT]
-> If your unit does not have the green terminal block with Modbus on terminals 4 and 5,
+> If your unit does not have the green terminal block with Modbus on terminals 4 and 5
+> (for example the **Flow30**, which has no Modbus RTU interface),
 > this project is not compatible: the ESP will have nothing to communicate with.
 
 ## Shopping list
@@ -136,12 +146,31 @@ this repository. At the top of the file, you can customize:
 | `modbus_address` | `2` | Unit's Modbus address (`2` by default from the factory) |
 
 To localize entity names into another language, see
-[Language support](#language-support).
+[Language support](#language-support). For Blue PCB units or units with
+humidity/CO₂/VOC sensors, see [Optional packages](#optional-packages).
 
 > [!TIP]
 > Prefer a standalone configuration? Paste the full contents of
 > [`esphome/helty-flow40.yaml`](esphome/helty-flow40.yaml) instead
 > of `device.yaml`. It works identically, though you will need to apply future updates manually.
+
+### Optional packages
+
+The default configuration targets a base **Flow40 with Green PCB** (*Elettronica Verde*). If you have a **Flow120 / Flow120H / FlowC120**, a **Blue PCB** (*Elettronica Blu*) unit, or **air-quality sensors**, uncomment the matching line(s) in `device.yaml`:
+
+```yaml
+    files:
+      - esphome/helty-flow40.yaml
+      - esphome/flow120.yaml         # Flow120 / 120H / C120 power (W) and airflow (m³/h)
+      - esphome/pcb-blue.yaml        # Blue PCB (remaps LED & Auto FC, adds Reset filter button)
+      - esphome/air-quality.yaml     # Humidity, CO2, VOC sensors & alarms
+      # - esphome/locales/it.yaml
+```
+
+- **`flow120.yaml`** updates **Estimated power** (`3 / 6 / 9 / 13 / 16.3 / 39 W`, with 1 decimal) and **Estimated airflow** (`13 / 30 / 45 / 60 / 80 / 120 m³/h`) to the official Flow120/120H/C120 datasheet values.
+- **`pcb-blue.yaml`** removes Green PCB's `HR 1060` register so the bus stays free of Modbus exceptions, maps **Panel LED** (`HR 1096`) and **Auto free cooling** (`HR 1101`) to the Blue PCB registers, and adds a **Reset filter** button (`HR 1100`). *(Implemented from Helty's Modbus register map and HeltyShell; community feedback from physical Blue PCB units is welcome.)*
+- **`air-quality.yaml`** works on both Green and Blue PCBs. It inspects the missing-sensor bits of `IR 1006` (`0x1000` and `0x4000`), so if your unit only has humidity (no CO₂/VOC), the missing sensors report `unknown` instead of dummy values. When humidity is present, the [dashboard card](#dashboard-card) displays it next to the indoor temperature automatically.
+- If you aren't sure whether your unit has a Green or Blue PCB, check it with `./helty info` in [HeltyShell](https://github.com/fabioscarparo/HeltyShell).
 
 ### 2. First flash over USB
 
@@ -168,7 +197,7 @@ At this stage, the logs will show Modbus timeouts: this is normal since the unit
   <img src="https://raw.githubusercontent.com/fabioscarparo/helty-home-assistant/main/images/wiring.svg" alt="Wiring: terminal 1 to G, terminal 2 to DC 24V, terminal 4 to A, terminal 5 to B" width="720">
 </p>
 
-| Flow40 terminal | Signal | Atomic RS485 Base |
+| Unit terminal | Signal | Atomic RS485 Base |
 |---|---|---|
 | 1 | 24 Vdc - (GND) | **G** |
 | 2 | 24 Vdc + | **DC 24V** |
@@ -188,7 +217,7 @@ At this stage, the logs will show Modbus timeouts: this is normal since the unit
 
 ### 4. First power-up
 
-1. Restore power to the Flow40: the base powers the ATOM Lite, which connects to Wi-Fi within a few seconds.
+1. Restore power to the unit: the base powers the ATOM Lite, which connects to Wi-Fi within a few seconds.
 2. Open the device **Logs** in ESPHome Device Builder: Modbus timeouts should now be replaced by valid register reads.
 3. If you still see only timeouts after a minute, swap the wires on terminals 4 and 5 (or `A` and `B` on the base) and try again. For further diagnostics, see [Troubleshooting](docs/troubleshooting.md).
 
@@ -205,7 +234,7 @@ Install the [Helty Flow40 card](#dashboard-card) for a dashboard interface model
 
 ## More than one unit
 
-Each Flow40 gets its own ATOM Lite and RS485 base, wired to its own terminal block and powered by its own 24 V: repeat the installation for every unit. Only a few things change from one unit to the next:
+Each unit gets its own ATOM Lite and RS485 base, wired to its own terminal block and powered by its own 24 V: repeat the installation for every unit. Only a few things change from one unit to the next:
 
 - **A new device for each ATOM**: in ESPHome Device Builder, select **+ New device** again and give each unit its own `device_name` and `friendly_name`, so the entity IDs and the fallback hotspot don't clash:
 
@@ -367,18 +396,21 @@ The ESP polls the unit every 10 seconds over Modbus RTU (19200 baud, 8N1):
 
 | Register | Content |
 |---|---|
-| IR 1000, IR 1001 | Indoor and outdoor temperature (in tenths of °C) |
-| IR 1006 | Alarm bitmask |
+| IR 1000, IR 1001 | Indoor and outdoor temperature (signed, in tenths of °C) |
+| IR 1006 | Alarm and operational status bitmask (`Free cooling active`, `Free heating active`, alarms, sensor flags) |
+| IR 1010, IR 1020 | Partial filter air counter and total air volume counter (in tenths of m³) |
 | IR 1012 | Firmware version |
 | HR 1000 | Operating state: `0` Off, `1`-`4` Speed, `5` Hyper, `6` Night, `7` Free cooling |
+| HR 1051, HR 1070, HR 1072 | Manual free cooling timer (min) and frost heater ON/OFF thresholds (read-only diagnostics) |
+| HR 1060 | Green PCB `ConfigStatus` bitmask (`0x01` Auto free cooling, `0x04` Panel LED off) |
 
-- **Only HR 1000 is ever written (`0`-`7`).** All controls (fan, speeds, presets, and switches) route through a single internal select entity.
+- **Strict write discipline:** On Green PCB, only `HR 1000` (`0`-`7`, via the internal select) and `HR 1060` (read-modify-write preserving all other bits, only after a valid read) are ever written. With `pcb-blue.yaml`, `HR 1060` is replaced by `HR 1096`, `HR 1101`, and the `HR 1100` (`0x4550`) filter reset button.
 - **Zero writes on boot**: Entities remain `unknown` until the first polling cycle completes (~10 seconds after boot).
 - **Smart turn-on behavior**: Turning the fan on without specifying a speed restores the last active speed rather than defaulting to maximum.
 - **Preset memory**: Turning off an active preset restores the previous fan speed.
-- **Estimated power**: the unit has no power meter, so the firmware reports the power of the running mode from the Flow40 datasheet. Free cooling is a bypass at the speed in use, so it reports that speed. The values are substitutions at the top of [`helty-flow40.yaml`](esphome/helty-flow40.yaml); to get kWh for the Energy dashboard, see [docs/home-assistant.md](docs/home-assistant.md#energy).
+- **Estimated power & airflow**: the unit has no power meter or live flow rate register, so the firmware reports the datasheet values for the running mode (Free cooling is a bypass at the speed in use, so it reports that speed). Defaults match the Flow40 datasheet; enable [`esphome/flow120.yaml`](esphome/flow120.yaml) for Flow120/120H/C120 or override `power_*` / `airflow_*` in `device.yaml`. To get kWh for the Energy dashboard, see [docs/home-assistant.md](docs/home-assistant.md#energy).
 - **Alarm code `20480` (`0x5000`) is normal**: These bits indicate "no humidity sensor" and "no CO₂ sensor", which are always set on the base Flow40 model.
-- **Resetting the filter alarm**: After cleaning or replacing the filter, press and hold the **Ventilation** and **Hyper** buttons simultaneously on the unit's wall panel for 5 seconds until all LEDs blink twice.
+- **Resetting the filter alarm**: On Green PCB units, after cleaning or replacing the filter, press and hold the **Ventilation** and **Hyper** buttons simultaneously on the unit's wall panel for 5 seconds until all LEDs blink twice. Blue PCB units with [`pcb-blue.yaml`](esphome/pcb-blue.yaml) can also reset the partial filter counter directly from Home Assistant via the **Reset filter** button (`HR 1100`).
 
 For the complete register table, including decoded alarm bits and undocumented registers, see [Modbus registers](docs/modbus-registers.md).
 
@@ -394,6 +426,9 @@ hacs.json                  HACS manifest for the dashboard card
 esphome/
   device.yaml              Minimal config to paste into ESPHome Device Builder
   helty-flow40.yaml        Core ESPHome configuration (loaded by device.yaml)
+  flow120.yaml             Optional package with Flow120/120H/C120 power & airflow specs
+  pcb-blue.yaml            Optional package for Blue PCB (Elettronica Blu) units
+  air-quality.yaml         Optional package for Humidity, CO2, and VOC sensors
   locales/it.yaml          Italian translation for entity and preset names
   secrets.yaml.example     Template for ESPHome secrets
 docs/
@@ -411,14 +446,14 @@ Bug reports, feedback, and pull requests are welcome! If you run into an issue, 
 
 Areas where contributions are especially appreciated:
 
-- **Other firmware versions** - Tested on a Flow40 running firmware `117` (`PID 0x1102`). Reports from other firmware revisions are very helpful.
-- **Registers 1010 and 1014** - Suspected to track operating or filter hours. Both are included in the configuration as disabled-by-default diagnostic sensors: enable them in Home Assistant and share how they behave over time.
+- **Other models & Blue PCB units** - Tested on a Flow40 and a Flow120 (Green PCB, firmware `117`, `PID 0x1102`). Feedback from Blue PCB units (`pcb-blue.yaml`), units with air-quality sensors (`air-quality.yaml`), or other firmware revisions is very helpful.
+- **Register 1014** - Still undocumented (register `1010` is now confirmed as the partial filter air counter). `Register 1014` remains included as a disabled-by-default diagnostic sensor: enable it in Home Assistant and share if you see it change.
 - **Alternative hardware** - Feedback from testing other M5Stack Atom boards (e.g., AtomS3 Lite) or RS-485 transceivers.
 - **Translations** - See [Help translate](#help-translate).
 
 ## Disclaimer
 
-This is an independent community project and is not affiliated with, endorsed by, or supported by Helty S.r.l. Helty and Flow40 are trademarks of their respective owners. Opening the ventilation unit and wiring external hardware is done entirely at your own risk and may void your warranty.
+This is an independent community project and is not affiliated with, endorsed by, or supported by Helty S.r.l. Helty, Flow40, and Flow120 are trademarks of their respective owners. Opening the ventilation unit and wiring external hardware is done entirely at your own risk and may void your warranty.
 
 ## License
 

@@ -69,18 +69,28 @@ it's a communication problem: see the first section.
 
 ## The filter alarm stays on after cleaning
 
-The unit keeps the alarm until you reset it on its wall panel: hold
-**ventilation** and **hyper** together for 5 seconds, until all the LEDs
-blink twice. The **Filter alarm** entity turns off at the next read, about
-10 seconds later.
+On Green PCB units, the unit keeps the alarm until you reset it on its wall
+panel: hold **ventilation** and **hyper** together for 5 seconds, until all the
+LEDs blink twice. On Blue PCB units with `esphome/pcb-blue.yaml`, you can also
+press the **Reset filter** button in Home Assistant. The **Filter alarm**
+entity turns off (and **Filter air** resets) at the next read, about 10 seconds
+later.
 
-## The card says it can't find the Flow40
+## Panel LED and Auto free cooling stay unknown (or logs show exception 0x02 on register 1060)
 
-The card finds the unit by the model that version 1.0.0 of the ESPHome
+The default configuration expects a **Green PCB** (*Elettronica Verde*) unit,
+which exposes those settings on `HR 1060`. If your unit uses a **Blue PCB**
+(*Elettronica Blu*), uncomment `- esphome/pcb-blue.yaml` in `device.yaml` and
+reinstall wirelessly. You can verify the PCB revision with `./helty info` in
+[HeltyShell](https://github.com/fabioscarparo/HeltyShell).
+
+## The card says it can't find the unit
+
+The card finds the unit by the model that version 1.0.0 or later of the ESPHome
 configuration sets (`helty-flow40`), and recognizes the entities by their
 icons. Install the configuration again with **Install → Wirelessly**, then
 check on the device page in Home Assistant that the model reads
-**helty-flow40** and the firmware **1.0.0**.
+**helty-flow40** and the firmware **1.0.0** or later.
 
 ## A control of the card is greyed out
 

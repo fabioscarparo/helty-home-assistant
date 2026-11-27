@@ -15,7 +15,7 @@
  * MIT License - Copyright (c) 2026 Fabio Scarparo
  */
 
-const VERSION = "1.1.2";
+const VERSION = "1.2.0";
 const CARD_TYPE = "helty-flow40-card";
 const EDITOR_TYPE = "helty-flow40-card-editor";
 const MODEL = "helty-flow40"; // from `project: name: fabioscarparo.helty-flow40`
@@ -211,7 +211,8 @@ function resolveEntities(hass, deviceId, chosen) {
         found[role] = id;
         break;
       }
-      if (domain === "sensor" && attributes.device_class === "temperature") temperatures.push(id);
+      if (!found.humidity && domain === "sensor" && attributes.device_class === "humidity" && !entry.entity_category) found.humidity = id;
+      if (domain === "sensor" && attributes.device_class === "temperature" && !entry.entity_category) temperatures.push(id);
       if (domain === "binary_sensor" && attributes.device_class === "problem") problems.push(id);
     }
     // Configurations older than 1.0.0 have no icons on the temperatures: they are

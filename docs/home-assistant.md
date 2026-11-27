@@ -10,10 +10,15 @@ device named **Helty Flow40**, with English names. Check yours in
 |---|---|
 | Ventilation | `fan.helty_flow40_ventilation` |
 | Hyper, Night, Free cooling | `switch.helty_flow40_hyper`, `switch.helty_flow40_night`, `switch.helty_flow40_free_cooling` |
+| Panel LED, Auto free cooling | `switch.helty_flow40_panel_led`, `switch.helty_flow40_auto_free_cooling` |
 | Temperatures | `sensor.helty_flow40_indoor_temperature`, `sensor.helty_flow40_outdoor_temperature` |
+| Filter air, Total air | `sensor.helty_flow40_filter_air`, `sensor.helty_flow40_total_air` |
+| Free cooling / heating active | `binary_sensor.helty_flow40_free_cooling_active`, `binary_sensor.helty_flow40_free_heating_active` |
 | Filter alarm | `binary_sensor.helty_flow40_filter_alarm` |
+| Temperature difference alarm | `binary_sensor.helty_flow40_temperature_difference_alarm` |
 | Modbus communication | `binary_sensor.helty_flow40_modbus_communication` |
 | Estimated power | `sensor.helty_flow40_estimated_power` |
+| Estimated airflow | `sensor.helty_flow40_estimated_airflow` |
 
 ## Dashboard
 
@@ -57,7 +62,8 @@ entities:
 ## Energy
 
 The **Estimated power** sensor gives the watts of the running mode, from the
-Flow40 datasheet. To see the energy in kWh, and the unit in the Energy
+Flow40 datasheet (or the Flow120/120H/C120 datasheet when `esphome/flow120.yaml`
+is enabled). To see the energy in kWh, and the unit in the Energy
 dashboard, add an **Integral** helper:
 
 1. **Settings → Devices & services → Helpers → Create helper → Integral
@@ -136,9 +142,10 @@ mode: single
 To get it on your phone, replace the action with
 `notify.mobile_app_<your_phone>`.
 
-The alarm is reset only on the unit: Home Assistant can't clear it,
-because the configuration writes nothing but the operating mode. Once
-reset, the **Filter alarm** entity turns off at the next read.
+On Green PCB units, the alarm is reset only on the unit itself (Blue PCB units
+with `esphome/pcb-blue.yaml` also expose a **Reset filter** button in Home
+Assistant). Once reset, the **Filter alarm** entity turns off and **Filter air**
+returns to `0` at the next read.
 
 ### Alert when the unit stops answering
 
@@ -199,5 +206,38 @@ actions:
           - action: switch.turn_off
             target:
               entity_id: switch.helty_flow40_free_cooling
+mode: single
+```
+
+### Turn off the panel LEDs at night
+
+Handy for bedroom installations: dims the room completely while you sleep and
+turns the wall panel LEDs back on in the morning.
+
+```yaml
+alias: Ventilation - Panel LED off at night
+triggers:
+  - trigger: time
+    at: "23:00:00"
+    id: evening
+  - trigger: time
+    at: "07:00:00"
+    id: morning
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: evening
+        sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: switch.helty_flow40_panel_led
+      - conditions:
+          - condition: trigger
+            id: morning
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.helty_flow40_panel_led
 mode: single
 ```

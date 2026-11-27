@@ -1,0 +1,93 @@
+# -----------------------------------------------------------------------------
+# Helty Flow - Optional air quality sensors package
+# https://github.com/fabioscarparo/helty-home-assistant
+#
+# Include after esphome/helty-flow40.yaml in device.yaml on units equipped with
+# humidity, CO2 and/or VOC sensors (e.g. Flow40 Plus/Elite, Flow120).
+#
+# Works with both Green PCB and Blue PCB units. Each sensor checks the
+# missing-sensor bits of IR 1006 (0x1000 humidity, 0x4000 CO2/VOC) and reports
+# unknown when the corresponding hardware sensor is not fitted, avoiding the
+# firmware's fallback values (such as 40.0 % humidity).
+# -----------------------------------------------------------------------------
+
+sensor:
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: indoor_humidity
+    name: "${name_indoor_humidity}"
+    register_type: read
+    address: 1004
+    value_type: U_WORD
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+    accuracy_decimals: 1
+    icon: mdi:water-percent
+    lambda: |-
+      if (id(vmc_alarms) < 0 || (id(vmc_alarms) & 0x1000) != 0) return NAN;
+      return x * 0.1f;
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: co2_level
+    name: "${name_co2}"
+    register_type: read
+    address: 1005
+    value_type: U_WORD
+    unit_of_measurement: "ppm"
+    device_class: carbon_dioxide
+    state_class: measurement
+    accuracy_decimals: 0
+    icon: mdi:molecule-co2
+    lambda: |-
+      if (id(vmc_alarms) < 0 || (id(vmc_alarms) & 0x4000) != 0) return NAN;
+      return x;
+
+  # IR 1015 reports ppb or a unitless VOC index depending on the unit/firmware
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: voc_level
+    name: "${name_voc}"
+    register_type: read
+    address: 1015
+    value_type: U_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+    icon: mdi:molecule
+    lambda: |-
+      if (id(vmc_alarms) < 0 || (id(vmc_alarms) & 0x4000) != 0) return NAN;
+      return x;
+
+binary_sensor:
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: high_humidity_alarm
+    name: "${name_high_humidity_alarm}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0040
+    device_class: problem
+    icon: mdi:water-alert
+
+  # Helty's register table lists "High Humidity" for both 0x0040 and 0x0080,
+  # while earlier notes called 0x0080 low humidity
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: humidity_alarm
+    name: "${name_humidity_alarm}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0080
+    device_class: problem
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: helty
+    id: co2_alarm
+    name: "${name_co2_alarm}"
+    register_type: read
+    address: 1006
+    bitmask: 0x0200
+    device_class: problem
+    icon: mdi:molecule-co2
