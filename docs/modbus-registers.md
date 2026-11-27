@@ -58,13 +58,13 @@ With the optional **`pcb-blue.yaml`** package, `HR 1060` is removed and writes g
 | IR 1004 | Relative humidity | `×0.1 %` (fallback `400` = `40.0 %` if unfitted) | Indoor humidity (`air-quality.yaml`) |
 | IR 1005 | CO2eq / CO2 | `ppm` (if sensor fitted) | CO2 (`air-quality.yaml`) |
 | IR 1006 | Alarms and status flags | 16-bit bitmask, details below | Alarm code + decoded binary sensors |
-| IR 1010 | Partial filter air counter | `×0.1 m³` | Filter air |
+| IR 1010 | Partial filter air counter | `×10 m³` (1 unit = 10 m³) | Filter air |
 | IR 1011 | Temperature? | `×0.1 °C` (observed equal to IR 1000) | Not exposed |
 | IR 1012 | Firmware version | `117` on tested units | Firmware version (diagnostic) |
 | IR 1013 | PID (model) | `0x1102` on tested Flow40 and Flow120 | Not exposed |
 | IR 1014 | Unknown | | Register 1014 (diagnostic, disabled by default) |
 | IR 1015 | VOC / IAQ | `ppb` or VOC index (if sensor fitted) | VOC (`air-quality.yaml`) |
-| IR 1020 | Total air volume counter | `×0.1 m³` | Total air |
+| IR 1020 | Total air volume counter | `×10 m³` (1 unit = 10 m³) | Total air |
 
 `air-quality.yaml` checks the missing-sensor bits of `IR 1006` (`0x1000` and `0x4000`) so unfitted sensors report `unknown` instead of fallback values like `40.0 %` or `0 ppm`.
 

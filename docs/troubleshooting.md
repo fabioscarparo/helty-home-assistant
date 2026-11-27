@@ -106,8 +106,9 @@ app may keep the old frontend in its cache: reset it in **Settings →
 Companion app → Troubleshooting → Reset frontend cache** on Android, or
 **Settings → Companion app → Debugging → Clear web view cache** on iOS.
 
-## Alarm code reads 20480
+## Alarm code reads 20480 or 53248
 
-That's normal: 20480 is 0x5000, the "no humidity sensor" and "no CO2
-sensor" bits, always on in the Flow40. Real alarms have their own
+That's normal: `20480` (`0x5000`) is the "no humidity sensor" and "no CO2
+sensor" bits, always on in the base Flow40; `53248` (`0xD000`) adds bit
+`0x8000` when **Auto free cooling** is enabled. Real alarms have their own
 entities. Details in [Modbus registers](modbus-registers.md).

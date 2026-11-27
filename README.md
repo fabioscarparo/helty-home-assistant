@@ -48,7 +48,7 @@ It is designed to be simple and inexpensive to build:
 | Hyper, Night, Free cooling | Switches | Activate a preset. Presets are mutually exclusive; turning one off restores the previous fan speed |
 | Auto free cooling, Panel LED | Config switches | Toggle automatic free cooling (`HR 1060` on Green PCB, `HR 1101` with `pcb-blue.yaml`) and the wall panel LEDs (`HR 1060` / `HR 1096`; disabled by default on Flow40 because the FlowEASY panel ignores it, enabled automatically by `flow120.yaml`) |
 | Indoor and outdoor temperature | Sensors | In °C, with 0.1 °C resolution |
-| Filter air, Total air | Sensors | Partial filter air volume (`IR 1010`) and lifetime total air volume (`IR 1020`), in m³ (0.1 m³ resolution), to track filter wear |
+| Filter air, Total air | Sensors | Partial filter air volume (`IR 1010`) and lifetime total air volume (`IR 1020`), in m³ (10 m³ resolution), to track filter wear |
 | Estimated power | Sensor | In W, from the Helty datasheet for the running mode — Flow40: night 2 W, speeds 1-4: 4, 6, 9, 18 W, hyper 20 W (use `flow120.yaml` for Flow120: 3, 6, 9, 13, 16.3, 39 W). The unit has no power meter. Not shown on the card |
 | Estimated airflow | Sensor | In m³/h, from the Helty datasheet for the running mode — Flow40: night 8, speeds 1-4: 10, 17, 26, 37, hyper 42 m³/h (Flow120 with `flow120.yaml`: 13, 30, 45, 60, 80, 120 m³/h). Not shown on the card |
 | Free cooling active, Free heating active | Binary sensors | Report when free cooling or free heating bypass is actually running (`IR 1006`) |
@@ -398,7 +398,7 @@ The ESP polls the unit every 10 seconds over Modbus RTU (19200 baud, 8N1):
 |---|---|
 | IR 1000, IR 1001 | Indoor and outdoor temperature (signed, in tenths of °C) |
 | IR 1006 | Alarm and operational status bitmask (`Free cooling active`, `Free heating active`, alarms, sensor flags) |
-| IR 1010, IR 1020 | Partial filter air counter and total air volume counter (in tenths of m³) |
+| IR 1010, IR 1020 | Partial filter air counter and total air volume counter (in tens of m³, `×10 m³`) |
 | IR 1012 | Firmware version |
 | HR 1000 | Operating state: `0` Off, `1`-`4` Speed, `5` Hyper, `6` Night, `7` Free cooling |
 | HR 1051, HR 1070, HR 1072 | Manual free cooling timer (min) and frost heater ON/OFF thresholds (read-only diagnostics) |
@@ -409,7 +409,7 @@ The ESP polls the unit every 10 seconds over Modbus RTU (19200 baud, 8N1):
 - **Smart turn-on behavior**: Turning the fan on without specifying a speed restores the last active speed rather than defaulting to maximum.
 - **Preset memory**: Turning off an active preset restores the previous fan speed.
 - **Estimated power & airflow**: the unit has no power meter or live flow rate register, so the firmware reports the datasheet values for the running mode (Free cooling is a bypass at the speed in use, so it reports that speed). Defaults match the Flow40 datasheet; enable [`esphome/flow120.yaml`](esphome/flow120.yaml) for Flow120/120H/C120 or override `power_*` / `airflow_*` in `device.yaml`. To get kWh for the Energy dashboard, see [docs/home-assistant.md](docs/home-assistant.md#energy).
-- **Alarm code `20480` (`0x5000`) is normal**: These bits indicate "no humidity sensor" and "no CO₂ sensor", which are always set on the base Flow40 model.
+- **Alarm code `20480` (`0x5000`) or `53248` (`0xD000`) is normal**: `0x5000` indicates "no humidity sensor" and "no CO₂ sensor" (always set on the base Flow40), and `0x8000` (`+32768`) turns on when **Auto free cooling** is enabled.
 - **Resetting the filter alarm**: On Green PCB units, after cleaning or replacing the filter, press and hold the **Ventilation** and **Hyper** buttons simultaneously on the unit's wall panel for 5 seconds until all LEDs blink twice. Blue PCB units with [`pcb-blue.yaml`](esphome/pcb-blue.yaml) can also reset the partial filter counter directly from Home Assistant via the **Reset filter** button (`HR 1100`).
 
 For the complete register table, including decoded alarm bits and undocumented registers, see [Modbus registers](docs/modbus-registers.md).

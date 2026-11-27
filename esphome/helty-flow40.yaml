@@ -21,9 +21,9 @@
 #   IR 1000  indoor temperature        x0.1 °C (signed)
 #   IR 1001  outdoor temperature       x0.1 °C (signed)
 #   IR 1006  alarm & status bitmask    (0x5000 = no CO2 and humidity sensors)
-#   IR 1010  partial filter air        x0.1 m³
+#   IR 1010  partial filter air        x10 m³
 #   IR 1012  firmware version
-#   IR 1020  total air volume          x0.1 m³
+#   IR 1020  total air volume          x10 m³
 #   HR 1000  machine state             0=off 1-4=speed 5=hyper 6=night 7=free cooling
 #   HR 1051  manual free cooling timer min (read-only diagnostic)
 #   HR 1060  ConfigStatus bitmask      0x01=AutoFC 0x02=NoSensors 0x04=LedOff
@@ -493,10 +493,10 @@ sensor:
     unit_of_measurement: "m³"
     device_class: volume
     state_class: total_increasing
-    accuracy_decimals: 1
+    accuracy_decimals: 0
     icon: mdi:air-filter
     filters:
-      - multiply: 0.1
+      - multiply: 10
 
   - platform: modbus_controller
     modbus_controller_id: helty
@@ -508,10 +508,10 @@ sensor:
     unit_of_measurement: "m³"
     device_class: volume
     state_class: total_increasing
-    accuracy_decimals: 1
+    accuracy_decimals: 0
     icon: mdi:counter
     filters:
-      - multiply: 0.1
+      - multiply: 10
 
   - platform: modbus_controller
     modbus_controller_id: helty
